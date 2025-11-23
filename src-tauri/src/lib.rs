@@ -22,10 +22,10 @@ pub fn run() {
             db::get_version,
             db::set_version,
             // Crypto commands
-            crypto::encrypt_data,
-            crypto::decrypt_data,
-            crypto::generate_hash,
-            crypto::verify_hash,
+            crypto::generate_key,
+            crypto::derive_password_key,
+            crypto::verify_password_key,
+            crypto::get_crypto_config,
             // API commands
             api::make_request,
             api::fetch_data,

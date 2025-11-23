@@ -9,14 +9,21 @@ export interface DbResult {
 }
 
 // Crypto types
-export interface EncryptionResult {
-  data: string;
-  algorithm: string;
+export interface MasterKey {
+  key: number[];
 }
 
-export interface DecryptionResult {
-  data: string;
-  success: boolean;
+export interface DerivedKey {
+  key: string;
+  salt: string;
+}
+
+export interface CryptoConfig {
+  argon2_mem_cost: number;
+  argon2_time_cost: number;
+  argon2_parallelism: number;
+  master_key_size: number;
+  algorithm: string;
 }
 
 // API types

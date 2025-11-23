@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { DbResult, EncryptionResult, DecryptionResult, ApiRequest, ApiResponse } from '../types/tauri';
+import type { DbResult, MasterKey, DerivedKey, CryptoConfig, ApiRequest, ApiResponse } from '../types/tauri';
 
 // Database commands
 export const db = {
@@ -26,20 +26,20 @@ export const db = {
 
 // Crypto commands
 export const crypto = {
-  async encryptData(data: string, key: string): Promise<EncryptionResult> {
-    return await invoke('encrypt_data', { data, key });
+  async generateKey(): Promise<MasterKey> {
+    return await invoke('generate_key');
   },
 
-  async decryptData(data: string, key: string): Promise<DecryptionResult> {
-    return await invoke('decrypt_data', { data, key });
+  async derivePasswordKey(password: string): Promise<DerivedKey> {
+    return await invoke('derive_password_key', { password });
   },
 
-  async generateHash(data: string): Promise<string> {
-    return await invoke('generate_hash', { data });
+  async verifyPasswordKey(password: string, hash: string): Promise<boolean> {
+    return await invoke('verify_password_key', { password, hash });
   },
 
-  async verifyHash(data: string, hash: string): Promise<boolean> {
-    return await invoke('verify_hash', { data, hash });
+  async getCryptoConfig(): Promise<CryptoConfig> {
+    return await invoke('get_crypto_config');
   },
 };
 
