@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { DbResult, Account, Operation, State, MasterKey, DerivedKey, CryptoConfig, ApiRequest, ApiResponse, VersionLogRecord } from '../types/tauri';
+import type { DbResult, Account, Operation, State, AssetAllocation, MasterKey, DerivedKey, CryptoConfig, ApiRequest, ApiResponse, VersionLogRecord } from '../types/tauri';
 
 // Utility commands
 export const app = {
@@ -94,6 +94,10 @@ export const api = {
 
   async getBalanceHistory(accountId: number): Promise<State[]> {
     return await invoke('get_balance_history', { accountId });
+  },
+
+  async getAssetAllocation(): Promise<AssetAllocation[]> {
+    return await invoke('get_asset_allocation');
   },
 
   // HTTP requests

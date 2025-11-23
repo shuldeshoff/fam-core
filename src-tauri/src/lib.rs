@@ -104,6 +104,7 @@ pub fn run() {
             api::get_account_balance,
             api::get_net_worth,
             api::get_balance_history,
+            api::get_asset_allocation,
             api::make_request,
             api::fetch_data,
             api::post_data,

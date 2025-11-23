@@ -30,6 +30,12 @@ export interface State {
   ts: number;
 }
 
+export interface AssetAllocation {
+  type: string;
+  total_balance: number;
+  account_count: number;
+}
+
 export interface VersionLogRecord {
   id: number;
   entity: string;

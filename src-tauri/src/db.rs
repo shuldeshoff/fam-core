@@ -53,6 +53,14 @@ pub struct State {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct AssetAllocation {
+    #[serde(rename = "type")]
+    pub asset_type: String,
+    pub total_balance: f64,
+    pub account_count: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct VersionLogRecord {
     pub id: i64,
     pub entity: String,
@@ -642,6 +650,54 @@ pub fn get_balance_history(
     Ok(states)
 }
 
+/// Получение структуры активов (группировка по типам с агрегированием балансов)
+/// 
+/// Возвращает распределение активов по типам аккаунтов
+/// Для каждого типа вычисляется:
+/// - Общая сумма балансов всех аккаунтов этого типа
+/// - Количество аккаунтов
+/// 
+/// # Параметры
+/// - `path` - путь к базе данных
+/// - `key` - ключ шифрования
+pub fn get_asset_allocation(
+    path: &str,
+    key: &str,
+) -> Result<Vec<AssetAllocation>, DbError> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "key", key)?;
+    
+    // SQL запрос с группировкой по типам и суммированием балансов
+    // Включаем только аккаунты, у которых есть хотя бы одна запись в states
+    let mut stmt = conn.prepare(
+        "SELECT 
+            a.type,
+            SUM(latest_balances.balance) as total_balance,
+            COUNT(a.id) as account_count
+         FROM accounts a
+         INNER JOIN (
+             SELECT DISTINCT account_id,
+                    (SELECT balance FROM states s2 
+                     WHERE s2.account_id = s1.account_id 
+                     ORDER BY ts DESC LIMIT 1) as balance
+             FROM states s1
+         ) latest_balances ON latest_balances.account_id = a.id
+         GROUP BY a.type
+         ORDER BY total_balance DESC"
+    )?;
+    
+    let allocations = stmt.query_map([], |row| {
+        Ok(AssetAllocation {
+            asset_type: row.get(0)?,
+            total_balance: row.get(1)?,
+            account_count: row.get(2)?,
+        })
+    })?
+    .collect::<Result<Vec<_>, _>>()?;
+    
+    Ok(allocations)
+}
+
 /// Получение записей из version_log с опциональными фильтрами
 /// 
 /// # Параметры
@@ -1013,4 +1069,14 @@ pub async fn get_balance_history_command(
 ) -> Result<Vec<State>, String> {
     get_balance_history(&path, &key, account_id)
         .map_err(|e| format!("Failed to get balance history: {}", e))
+}
+
+/// Получение структуры активов (распределение по типам)
+#[tauri::command]
+pub async fn get_asset_allocation_command(
+    path: String,
+    key: String,
+) -> Result<Vec<AssetAllocation>, String> {
+    get_asset_allocation(&path, &key)
+        .map_err(|e| format!("Failed to get asset allocation: {}", e))
 }

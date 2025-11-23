@@ -123,6 +123,16 @@ pub async fn get_balance_history(
         .map_err(|e| format!("Failed to get balance history: {}", e))
 }
 
+/// Получение структуры активов (распределение по типам)
+#[tauri::command]
+pub async fn get_asset_allocation(
+    app: tauri::AppHandle,
+) -> Result<Vec<db::AssetAllocation>, String> {
+    let (db_path, key) = get_db_config(app)?;
+    db::get_asset_allocation(&db_path, &key)
+        .map_err(|e| format!("Failed to get asset allocation: {}", e))
+}
+
 // HTTP команды (заглушки)
 
 /// Выполнение HTTP запроса
