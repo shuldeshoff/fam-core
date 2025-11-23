@@ -88,7 +88,8 @@ function App() {
           wordBreak: 'break-word',
           minHeight: '40px',
           maxHeight: '200px',
-          overflowY: 'auto'
+          overflowY: 'auto',
+          color: '#333'
         }}>
           {result}
         </div>
