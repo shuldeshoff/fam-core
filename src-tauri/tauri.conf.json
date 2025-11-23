@@ -14,7 +14,11 @@
       {
         "title": "FAM-Core",
         "width": 800,
-        "height": 600
+        "height": 600,
+        "minWidth": 600,
+        "minHeight": 400,
+        "resizable": true,
+        "fullscreen": false
       }
     ],
     "security": {
@@ -30,6 +34,32 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "publisher": "FAM-Core Team",
+    "copyright": "Copyright © 2025",
+    "category": "Utility",
+    "shortDescription": "Secure wallet application",
+    "longDescription": "FAM-Core - кроссплатформенное приложение для управления кошельком с шифрованием",
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.13",
+      "hardenedRuntime": true,
+      "entitlements": null,
+      "exceptionDomain": null,
+      "signingIdentity": null,
+      "providerShortName": null
+    }
   }
 }
