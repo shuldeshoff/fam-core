@@ -606,6 +606,42 @@ pub fn get_net_worth(path: &str, key: &str) -> Result<f64, DbError> {
     Ok(net_worth)
 }
 
+/// Получение временного ряда балансов для аккаунта
+/// 
+/// Возвращает все записи из таблицы states для указанного аккаунта
+/// с сортировкой по временной метке (ts) в порядке возрастания
+/// 
+/// # Параметры
+/// - `path` - путь к базе данных
+/// - `key` - ключ шифрования
+/// - `account_id` - ID аккаунта
+pub fn get_balance_history(
+    path: &str,
+    key: &str,
+    account_id: i64,
+) -> Result<Vec<State>, DbError> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "key", key)?;
+    
+    let mut stmt = conn.prepare(
+        "SELECT id, account_id, balance, ts FROM states 
+         WHERE account_id = ?1 
+         ORDER BY ts ASC"
+    )?;
+    
+    let states = stmt.query_map([account_id], |row| {
+        Ok(State {
+            id: row.get(0)?,
+            account_id: row.get(1)?,
+            balance: row.get(2)?,
+            ts: row.get(3)?,
+        })
+    })?
+    .collect::<Result<Vec<_>, _>>()?;
+    
+    Ok(states)
+}
+
 /// Получение записей из version_log с опциональными фильтрами
 /// 
 /// # Параметры
@@ -966,4 +1002,15 @@ pub async fn get_account_balance_command(
 pub async fn get_net_worth_command(path: String, key: String) -> Result<f64, String> {
     get_net_worth(&path, &key)
         .map_err(|e| format!("Failed to get net worth: {}", e))
+}
+
+/// Получение временного ряда балансов для аккаунта
+#[tauri::command]
+pub async fn get_balance_history_command(
+    path: String,
+    key: String,
+    account_id: i64,
+) -> Result<Vec<State>, String> {
+    get_balance_history(&path, &key, account_id)
+        .map_err(|e| format!("Failed to get balance history: {}", e))
 }

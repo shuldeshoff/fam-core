@@ -112,6 +112,17 @@ pub async fn get_net_worth(app: tauri::AppHandle) -> Result<f64, String> {
         .map_err(|e| format!("Failed to get net worth: {}", e))
 }
 
+/// Получение временного ряда балансов для аккаунта
+#[tauri::command]
+pub async fn get_balance_history(
+    app: tauri::AppHandle,
+    account_id: i64,
+) -> Result<Vec<db::State>, String> {
+    let (db_path, key) = get_db_config(app)?;
+    db::get_balance_history(&db_path, &key, account_id)
+        .map_err(|e| format!("Failed to get balance history: {}", e))
+}
+
 // HTTP команды (заглушки)
 
 /// Выполнение HTTP запроса

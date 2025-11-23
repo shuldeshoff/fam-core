@@ -103,6 +103,7 @@ pub fn run() {
             api::list_versions,
             api::get_account_balance,
             api::get_net_worth,
+            api::get_balance_history,
             api::make_request,
             api::fetch_data,
             api::post_data,
