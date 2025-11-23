@@ -172,3 +172,28 @@ pub async fn set_version(path: String, key: String, version: String) -> Result<D
         message: format!("DB version updated to: {}", version),
     })
 }
+
+/// Получение статуса базы данных
+#[tauri::command]
+pub async fn get_status() -> String {
+    "Database module is ready".to_string()
+}
+
+/// Запись тестового значения в таблицу meta
+#[tauri::command]
+pub async fn write_test_record(path: String, key: String, value: String) -> Result<(), String> {
+    let conn = Connection::open(&path)
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+    
+    conn.pragma_update(None, "key", &key)
+        .map_err(|e| format!("Failed to set encryption key: {}", e))?;
+    
+    // Обновляем значение в таблице meta, перезаписывая предыдущее значение
+    conn.execute(
+        "UPDATE meta SET version = ?1",
+        [&value],
+    )
+    .map_err(|e| format!("Failed to write test record: {}", e))?;
+    
+    Ok(())
+}

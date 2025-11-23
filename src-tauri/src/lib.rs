@@ -21,6 +21,8 @@ pub fn run() {
             db::execute_query,
             db::get_version,
             db::set_version,
+            db::get_status,
+            db::write_test_record,
             // Crypto commands
             crypto::generate_key,
             crypto::derive_password_key,

@@ -22,6 +22,14 @@ export const db = {
   async setVersion(path: string, key: string, version: string): Promise<DbResult> {
     return await invoke('set_version', { path, key, version });
   },
+
+  async getStatus(): Promise<string> {
+    return await invoke('get_status');
+  },
+
+  async writeTestRecord(path: string, key: string, value: string): Promise<void> {
+    return await invoke('write_test_record', { path, key, value });
+  },
 };
 
 // Crypto commands
