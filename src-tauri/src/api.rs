@@ -133,6 +133,71 @@ pub async fn get_asset_allocation(
         .map_err(|e| format!("Failed to get asset allocation: {}", e))
 }
 
+// Команды верификации подписей
+
+/// Верификация подписи одной записи version_log
+/// 
+/// # Параметры
+/// - `version_id` - ID записи в version_log
+/// 
+/// # Возвращает
+/// - `Ok(true)` - подпись валидна
+/// - `Ok(false)` - подпись невалидна
+/// - `Err` - ошибка (запись не найдена и т.д.)
+#[tauri::command]
+pub async fn verify_entry(
+    app: tauri::AppHandle,
+    version_id: i64,
+) -> Result<bool, String> {
+    let (db_path, key) = get_db_config(app)?;
+    db::verify_version_signature(&db_path, &key, version_id)
+        .map_err(|e| format!("Failed to verify entry: {}", e))
+}
+
+/// Структура для результата верификации
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SignedVersion {
+    pub version_id: i64,
+    pub entity: String,
+    pub entity_id: i64,
+    pub action: String,
+    pub ts: i64,
+    pub is_valid: bool,
+}
+
+/// Получение списка всех подписанных записей с результатами верификации
+/// 
+/// # Возвращает
+/// Список всех записей version_log с результатами проверки их подписей
+#[tauri::command]
+pub async fn list_signed_versions(
+    app: tauri::AppHandle,
+) -> Result<Vec<SignedVersion>, String> {
+    let (db_path, key) = get_db_config(app)?;
+    
+    // Получаем все записи из version_log
+    let versions = db::list_version_log(&db_path, &key, None, None)
+        .map_err(|e| format!("Failed to list versions: {}", e))?;
+    
+    // Для каждой записи проверяем подпись
+    let mut signed_versions = Vec::new();
+    for version in versions {
+        let is_valid = db::verify_version_signature(&db_path, &key, version.id)
+            .unwrap_or(false); // Если ошибка при верификации - считаем невалидной
+        
+        signed_versions.push(SignedVersion {
+            version_id: version.id,
+            entity: version.entity,
+            entity_id: version.entity_id,
+            action: version.action,
+            ts: version.ts,
+            is_valid,
+        });
+    }
+    
+    Ok(signed_versions)
+}
+
 // HTTP команды (заглушки)
 
 /// Выполнение HTTP запроса
