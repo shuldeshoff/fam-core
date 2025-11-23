@@ -12,13 +12,13 @@ fn test_write_version_log() {
         std::fs::remove_file(test_db_path).unwrap();
     }
     
-    println!("=== Тест write_version_log ===");
+    println!("\n=== Тест автоматического логирования create_account ===");
     
     // Инициализируем БД
     db::init_db(test_db_path, test_key).expect("DB init failed");
     println!("✓ База данных инициализирована");
     
-    // Создаём аккаунт (он должен автоматически логировать создание)
+    // Создаём аккаунт (теперь должен автоматически логировать создание)
     let account_id = db::create_account(
         test_db_path,
         test_key,
@@ -28,7 +28,7 @@ fn test_write_version_log() {
     
     println!("✓ Аккаунт создан с ID: {}", account_id);
     
-    // Проверяем, что запись в version_log НЕ создалась автоматически (пока не реализовано)
+    // Проверяем, что запись в version_log СОЗДАЛАСЬ автоматически
     use rusqlite::Connection;
     let conn = Connection::open(test_db_path).unwrap();
     conn.pragma_update(None, "key", test_key).unwrap();
@@ -40,15 +40,32 @@ fn test_write_version_log() {
     ).unwrap();
     
     println!("Записей в version_log: {}", log_count);
+    assert_eq!(log_count, 1, "Должна быть 1 запись в version_log");
     
-    // Пока функция write_version_log приватная, она не вызывается автоматически
-    // В следующих промптах мы интегрируем её в create_account, add_operation и т.д.
+    // Проверяем содержимое записи
+    let (entity, entity_id, action, payload): (String, i64, String, String) = conn.query_row(
+        "SELECT entity, entity_id, action, payload FROM version_log LIMIT 1",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+    ).unwrap();
     
-    assert_eq!(log_count, 0, "Version log должен быть пуст (автологирование ещё не реализовано)");
+    println!("✓ Запись в version_log:");
+    println!("  entity: {}", entity);
+    println!("  entity_id: {}", entity_id);
+    println!("  action: {}", action);
+    println!("  payload: {}", payload);
+    
+    assert_eq!(entity, "account");
+    assert_eq!(entity_id, account_id);
+    assert_eq!(action, "create");
+    assert!(payload.contains("\"name\":\"Test Account\""));
+    assert!(payload.contains("\"type\":\"cash\""));
+    
+    println!("✓ Все проверки пройдены");
     
     // Очистка
     std::fs::remove_file(test_db_path).unwrap();
-    println!("✓ Тест пройден: функция write_version_log создана и готова к использованию");
+    println!("✓ Тест пройден: create_account автоматически логирует создание в version_log");
 }
 
 #[test]

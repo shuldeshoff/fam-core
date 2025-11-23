@@ -342,7 +342,6 @@ pub fn update_db_version(path: &str, key: &str, new_version: &str) -> Result<(),
 /// - `entity_id` - ID сущности
 /// - `action` - тип действия (create, update, delete)
 /// - `payload_json` - JSON-снимок состояния сущности
-#[allow(dead_code)] // Функция будет использоваться в следующих промптах
 fn write_version_log(
     conn: &Connection,
     entity: &str,
@@ -389,6 +388,20 @@ pub fn create_account(path: &str, key: &str, name: String, acc_type: String) -> 
     )?;
     
     let account_id = conn.last_insert_rowid();
+    
+    // Создаём объект Account для логирования
+    let account = Account {
+        id: account_id,
+        name: name.clone(),
+        acc_type: acc_type.clone(),
+        created_at,
+    };
+    
+    // Сериализуем аккаунт в JSON
+    let payload_json = serialize_entity(&account)?;
+    
+    // Логируем создание аккаунта
+    write_version_log(&conn, "account", account_id, "create", &payload_json)?;
     
     Ok(account_id)
 }
