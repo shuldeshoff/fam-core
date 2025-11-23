@@ -243,11 +243,59 @@ fn main() {
 
     println!("Текущая версия БД: {}", version);
 
-    if version == "4" {
-        println!("✓ Все миграции (M1-M4) применены");
+    if version == "5" {
+        println!("✓ Все миграции (M1-M5) применены");
+    } else if version == "4" {
+        println!("⚠️  Миграция M5 (version_log) ещё не применена");
     } else {
-        println!("⚠️  Ожидается версия 4, найдена: {}", version);
+        println!("⚠️  Ожидается версия 5, найдена: {}", version);
     }
+    println!();
+
+    // Проверка 7: Таблица version_log
+    println!("=== Проверка 7: Таблица version_log (M5) ===");
+    println!();
+
+    let has_version_log = tables.contains(&"version_log".to_string());
+    
+    if has_version_log {
+        println!("✓ Таблица version_log создана");
+        
+        let log_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM version_log", [], |row| row.get(0))
+            .unwrap_or(0);
+        
+        println!("Записей в version_log: {}", log_count);
+        
+        if log_count > 0 {
+            println!();
+            let mut stmt = conn.prepare(
+                "SELECT id, entity, entity_id, action, ts FROM version_log ORDER BY ts DESC LIMIT 5"
+            ).unwrap();
+            
+            let logs = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, i64>(4)?,
+                ))
+            }).unwrap();
+
+            for log in logs {
+                if let Ok((id, entity, entity_id, action, ts)) = log {
+                    let timestamp = chrono::NaiveDateTime::from_timestamp_opt(ts, 0)
+                        .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+                        .unwrap_or_else(|| ts.to_string());
+                    println!("  [{}] {} #{} | {} | {}", id, entity, entity_id, action, timestamp);
+                }
+            }
+        }
+    } else {
+        println!("❌ Таблица version_log не найдена (миграция M5 не применена)");
+    }
+    
     println!();
 
     // Итоговый отчёт

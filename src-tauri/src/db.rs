@@ -106,6 +106,11 @@ fn run_migrations(conn: &Connection) -> Result<(), DbError> {
         update_version(conn, 4)?;
     }
     
+    if version < 5 {
+        migration_v5_version_log(conn)?;
+        update_version(conn, 5)?;
+    }
+    
     Ok(())
 }
 
@@ -240,6 +245,40 @@ fn migration_v4_states(conn: &Connection) -> SqlResult<()> {
     // Уникальный индекс для предотвращения дублирования снимков
     conn.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_states_account_ts ON states(account_id, ts)",
+        [],
+    )?;
+    
+    Ok(())
+}
+
+/// Миграция v5: создание таблицы version_log для аудита изменений
+fn migration_v5_version_log(conn: &Connection) -> SqlResult<()> {
+    // Создаём таблицу version_log
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS version_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity TEXT NOT NULL,
+            entity_id INTEGER NOT NULL,
+            action TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            ts INTEGER NOT NULL
+        )",
+        [],
+    )?;
+    
+    // Создаём индексы для быстрого поиска
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_version_log_entity ON version_log(entity, entity_id)",
+        [],
+    )?;
+    
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_version_log_ts ON version_log(ts)",
+        [],
+    )?;
+    
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_version_log_action ON version_log(action)",
         [],
     )?;
     
