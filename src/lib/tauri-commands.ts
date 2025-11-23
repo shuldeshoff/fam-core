@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { DbResult, Account, Operation, State, AssetAllocation, MasterKey, DerivedKey, CryptoConfig, ApiRequest, ApiResponse, VersionLogRecord } from '../types/tauri';
+import type { DbResult, Account, Operation, State, AssetAllocation, MasterKey, DerivedKey, CryptoConfig, ApiRequest, ApiResponse, VersionLogRecord, SignedVersion } from '../types/tauri';
 
 // Utility commands
 export const app = {
@@ -98,6 +98,15 @@ export const api = {
 
   async getAssetAllocation(): Promise<AssetAllocation[]> {
     return await invoke('get_asset_allocation');
+  },
+
+  // Verification commands
+  async verifyEntry(versionId: number): Promise<boolean> {
+    return await invoke('verify_entry', { versionId });
+  },
+
+  async listSignedVersions(): Promise<SignedVersion[]> {
+    return await invoke('list_signed_versions');
   },
 
   // HTTP requests

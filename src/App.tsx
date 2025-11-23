@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "./lib/tauri-commands";
-import type { Account, Operation, State, AssetAllocation, VersionLogRecord } from "./types/tauri";
+import type { Account, Operation, State, AssetAllocation, VersionLogRecord, SignedVersion } from "./types/tauri";
 import "./App.css";
 
 function App() {
@@ -25,6 +25,12 @@ function App() {
   const [showLog, setShowLog] = useState(false);
   const [versionLog, setVersionLog] = useState<VersionLogRecord[]>([]);
   const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
+  
+  // Режим верификации подписей
+  const [showVerify, setShowVerify] = useState(false);
+  const [verifyVersionId, setVerifyVersionId] = useState("");
+  const [verifyResult, setVerifyResult] = useState<string>("");
+  const [signedVersions, setSignedVersions] = useState<SignedVersion[]>([]);
   
   // Балансы и Net Worth
   const [accountBalances, setAccountBalances] = useState<Record<number, number>>({});
@@ -228,6 +234,49 @@ function App() {
     setSelectedLogId(selectedLogId === logId ? null : logId);
   };
 
+  const handleShowVerify = async () => {
+    setShowLog(false);
+    setShowAnalytics(false);
+    setShowVerify(true);
+    setVerifyResult("");
+    setVerifyVersionId("");
+    await loadAllSignedVersions();
+  };
+
+  const handleCloseVerify = () => {
+    setShowVerify(false);
+    setVerifyResult("");
+    setVerifyVersionId("");
+    setSignedVersions([]);
+  };
+
+  const handleVerifyEntry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const versionId = parseInt(verifyVersionId);
+    if (isNaN(versionId)) {
+      setVerifyResult("Ошибка: введите корректный version_id (число)");
+      return;
+    }
+
+    try {
+      const isValid = await api.verifyEntry(versionId);
+      setVerifyResult(`Version ID ${versionId}: ${isValid ? "✓ Подпись валидна" : "✗ Подпись невалидна"}`);
+    } catch (error) {
+      setVerifyResult(`Ошибка верификации: ${error}`);
+    }
+  };
+
+  const loadAllSignedVersions = async () => {
+    try {
+      const signed = await api.listSignedVersions();
+      setSignedVersions(signed);
+      setMessage("");
+    } catch (error) {
+      setMessage(`Ошибка загрузки подписанных версий: ${error}`);
+    }
+  };
+
   const selectedAccount = accounts.find(acc => acc.id === selectedAccountId);
   const selectedLogRecord = versionLog.find(log => log.id === selectedLogId);
 
@@ -251,6 +300,9 @@ function App() {
           </button>
           <button onClick={showLog ? handleCloseLog : handleShowLog}>
             {showLog ? 'Закрыть журнал' : 'Журнал'}
+          </button>
+          <button onClick={showVerify ? handleCloseVerify : handleShowVerify}>
+            {showVerify ? 'Закрыть' : 'Верификация'}
           </button>
         </div>
       </div>
@@ -451,6 +503,86 @@ function App() {
               ))}
             </ul>
           )}
+        </section>
+      ) : showVerify ? (
+        <section style={{ padding: '15px', border: '1px solid #ddd' }}>
+          <h2>Верификация подписей</h2>
+          
+          {/* Форма проверки одной записи */}
+          <div style={{ marginBottom: '30px', padding: '15px', border: '1px solid #ccc' }}>
+            <h3>Проверить одну запись</h3>
+            <form onSubmit={handleVerifyEntry}>
+              <div style={{ marginBottom: '10px' }}>
+                <input
+                  type="text"
+                  placeholder="Введите version_id"
+                  value={verifyVersionId}
+                  onChange={(e) => setVerifyVersionId(e.target.value)}
+                  style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <button type="submit">Проверить подпись</button>
+            </form>
+            
+            {/* Результат проверки */}
+            {verifyResult && (
+              <div style={{
+                marginTop: '15px',
+                padding: '10px',
+                border: '1px solid #ccc',
+                backgroundColor: verifyResult.includes('✓') ? '#d4edda' : '#f8d7da',
+                color: '#333',
+                fontFamily: 'monospace'
+              }}>
+                {verifyResult}
+              </div>
+            )}
+          </div>
+          
+          {/* Список всех подписанных версий */}
+          <div style={{ padding: '15px', border: '1px solid #ccc' }}>
+            <h3>Все подписанные записи ({signedVersions.length})</h3>
+            {signedVersions.length === 0 ? (
+              <p>Нет подписанных записей</p>
+            ) : (
+              <ul style={{ listStyle: 'none', padding: 0 }}>
+                {signedVersions.map((sv) => (
+                  <li
+                    key={sv.version_id}
+                    style={{
+                      padding: '10px',
+                      marginBottom: '5px',
+                      border: '1px solid #ccc',
+                      backgroundColor: sv.is_valid ? '#d4edda' : '#f8d7da',
+                      color: '#333',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong>Version ID: {sv.version_id}</strong>
+                        {' | '}
+                        <span>{sv.entity}</span>
+                        {' '}
+                        <small>(entity_id: {sv.entity_id})</small>
+                        {' | '}
+                        <span>{sv.action}</span>
+                        <br />
+                        <small>{new Date(sv.ts * 1000).toLocaleString()}</small>
+                      </div>
+                      <div style={{
+                        fontWeight: 'bold',
+                        fontSize: '16px',
+                        color: sv.is_valid ? '#155724' : '#721c24'
+                      }}>
+                        {sv.is_valid ? '✓ Валидна' : '✗ Невалидна'}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </section>
       ) : (
         <>

@@ -45,6 +45,15 @@ export interface VersionLogRecord {
   ts: number;
 }
 
+export interface SignedVersion {
+  version_id: number;
+  entity: string;
+  entity_id: number;
+  action: string;
+  ts: number;
+  is_valid: boolean;
+}
+
 // Crypto types
 export interface MasterKey {
   key: number[];
