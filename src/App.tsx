@@ -48,10 +48,10 @@ function App() {
   };
 
   return (
-    <main className="container">
+    <main className="container" style={{ maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
       <h1>FAM-Core Test Interface</h1>
 
-      <div style={{ marginBottom: '20px', fontSize: '12px', color: '#666' }}>
+      <div style={{ marginBottom: '20px', fontSize: '12px', color: '#666', wordBreak: 'break-all' }}>
         <strong>БД:</strong> {dbPath || 'загрузка...'}
       </div>
 
@@ -63,9 +63,12 @@ function App() {
           placeholder="Введите значение..."
           style={{ 
             width: '100%', 
-            padding: '8px', 
+            padding: '10px', 
             marginBottom: '10px',
-            fontSize: '14px'
+            fontSize: '14px',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            boxSizing: 'border-box'
           }}
         />
         
@@ -82,7 +85,10 @@ function App() {
           backgroundColor: '#f5f5f5',
           borderRadius: '4px',
           fontSize: '14px',
-          wordBreak: 'break-word'
+          wordBreak: 'break-word',
+          minHeight: '40px',
+          maxHeight: '200px',
+          overflowY: 'auto'
         }}>
           {result}
         </div>
