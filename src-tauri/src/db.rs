@@ -312,6 +312,45 @@ pub fn update_db_version(path: &str, key: &str, new_version: &str) -> Result<(),
     Ok(())
 }
 
+// Функции для version_log (аудит изменений)
+
+/// Запись изменения в version_log
+/// 
+/// Функция должна вызываться внутри транзакций для обеспечения атомарности
+/// 
+/// # Параметры
+/// - `conn` - ссылка на транзакцию или соединение
+/// - `entity` - тип сущности (account, operation, state)
+/// - `entity_id` - ID сущности
+/// - `action` - тип действия (create, update, delete)
+/// - `payload_json` - JSON-снимок состояния сущности
+fn write_version_log(
+    conn: &Connection,
+    entity: &str,
+    entity_id: i64,
+    action: &str,
+    payload_json: &str,
+) -> Result<(), DbError> {
+    // Получаем текущий timestamp в секундах
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| DbError::InitError(format!("Failed to get timestamp: {}", e)))?
+        .as_secs() as i64;
+    
+    conn.execute(
+        "INSERT INTO version_log (entity, entity_id, action, payload, ts) VALUES (?1, ?2, ?3, ?4, ?5)",
+        [
+            entity,
+            &entity_id.to_string(),
+            action,
+            payload_json,
+            &ts.to_string(),
+        ],
+    )?;
+    
+    Ok(())
+}
+
 // Функции работы со счетами
 
 /// Создание нового счёта
