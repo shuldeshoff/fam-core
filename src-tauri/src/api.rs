@@ -93,6 +93,25 @@ pub async fn list_versions(
         .map_err(|e| format!("Failed to list versions: {}", e))
 }
 
+/// Получение текущего баланса аккаунта
+#[tauri::command]
+pub async fn get_account_balance(
+    app: tauri::AppHandle,
+    account_id: i64,
+) -> Result<f64, String> {
+    let (db_path, key) = get_db_config(app)?;
+    db::get_account_balance(&db_path, &key, account_id)
+        .map_err(|e| format!("Failed to get account balance: {}", e))
+}
+
+/// Получение общего Net Worth
+#[tauri::command]
+pub async fn get_net_worth(app: tauri::AppHandle) -> Result<f64, String> {
+    let (db_path, key) = get_db_config(app)?;
+    db::get_net_worth(&db_path, &key)
+        .map_err(|e| format!("Failed to get net worth: {}", e))
+}
+
 // HTTP команды (заглушки)
 
 /// Выполнение HTTP запроса

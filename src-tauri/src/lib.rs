@@ -101,6 +101,8 @@ pub fn run() {
             api::add_operation,
             api::get_operations,
             api::list_versions,
+            api::get_account_balance,
+            api::get_net_worth,
             api::make_request,
             api::fetch_data,
             api::post_data,

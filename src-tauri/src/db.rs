@@ -553,6 +553,59 @@ pub fn get_operations(path: &str, key: &str, account_id: i64) -> Result<Vec<Oper
     Ok(operations)
 }
 
+// Функции агрегирования
+
+/// Получение текущего баланса аккаунта
+/// 
+/// Возвращает последнее значение баланса из таблицы states
+/// Если записей нет, возвращает 0.0
+/// 
+/// # Параметры
+/// - `path` - путь к базе данных
+/// - `key` - ключ шифрования
+/// - `account_id` - ID аккаунта
+pub fn get_account_balance(path: &str, key: &str, account_id: i64) -> Result<f64, DbError> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "key", key)?;
+    
+    let balance: Result<f64, _> = conn.query_row(
+        "SELECT balance FROM states WHERE account_id = ?1 ORDER BY ts DESC LIMIT 1",
+        [account_id],
+        |row| row.get(0),
+    );
+    
+    // Если баланса нет, возвращаем 0.0
+    Ok(balance.unwrap_or(0.0))
+}
+
+/// Вычисление общего Net Worth
+/// 
+/// Возвращает сумму всех текущих балансов по всем аккаунтам
+/// Для каждого аккаунта берётся последняя запись из states
+/// 
+/// # Параметры
+/// - `path` - путь к базе данных
+/// - `key` - ключ шифрования
+pub fn get_net_worth(path: &str, key: &str) -> Result<f64, DbError> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "key", key)?;
+    
+    // Получаем последний баланс для каждого аккаунта и суммируем
+    let net_worth: f64 = conn.query_row(
+        "SELECT COALESCE(SUM(balance), 0.0) FROM (
+            SELECT DISTINCT account_id, 
+                   (SELECT balance FROM states s2 
+                    WHERE s2.account_id = s1.account_id 
+                    ORDER BY ts DESC LIMIT 1) as balance
+            FROM states s1
+        )",
+        [],
+        |row| row.get(0),
+    )?;
+    
+    Ok(net_worth)
+}
+
 /// Получение записей из version_log с опциональными фильтрами
 /// 
 /// # Параметры
@@ -895,4 +948,22 @@ pub async fn get_operations_command(
 ) -> Result<Vec<Operation>, String> {
     get_operations(&path, &key, account_id)
         .map_err(|e| format!("Failed to get operations: {}", e))
+}
+
+/// Получение текущего баланса аккаунта
+#[tauri::command]
+pub async fn get_account_balance_command(
+    path: String,
+    key: String,
+    account_id: i64,
+) -> Result<f64, String> {
+    get_account_balance(&path, &key, account_id)
+        .map_err(|e| format!("Failed to get account balance: {}", e))
+}
+
+/// Получение общего Net Worth
+#[tauri::command]
+pub async fn get_net_worth_command(path: String, key: String) -> Result<f64, String> {
+    get_net_worth(&path, &key)
+        .map_err(|e| format!("Failed to get net worth: {}", e))
 }

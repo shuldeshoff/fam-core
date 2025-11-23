@@ -83,6 +83,15 @@ export const api = {
     });
   },
 
+  // Aggregations
+  async getAccountBalance(accountId: number): Promise<number> {
+    return await invoke('get_account_balance', { accountId });
+  },
+
+  async getNetWorth(): Promise<number> {
+    return await invoke('get_net_worth');
+  },
+
   // HTTP requests
   async makeRequest(request: ApiRequest): Promise<ApiResponse> {
     return await invoke('make_request', { request });

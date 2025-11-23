@@ -26,12 +26,17 @@ function App() {
   const [versionLog, setVersionLog] = useState<VersionLogRecord[]>([]);
   const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
   
+  // Балансы и Net Worth
+  const [accountBalances, setAccountBalances] = useState<Record<number, number>>({});
+  const [netWorth, setNetWorth] = useState<number>(0);
+  
   // Сообщения об ошибках/успехе
   const [message, setMessage] = useState("");
 
   // Загрузка списка аккаунтов при старте
   useEffect(() => {
     loadAccounts();
+    loadNetWorth();
   }, []);
 
   // Загрузка операций при выборе аккаунта
@@ -47,9 +52,31 @@ function App() {
     try {
       const accountsList = await api.listAccounts();
       setAccounts(accountsList);
+      
+      // Загружаем балансы для всех аккаунтов
+      const balances: Record<number, number> = {};
+      for (const acc of accountsList) {
+        try {
+          const balance = await api.getAccountBalance(acc.id);
+          balances[acc.id] = balance;
+        } catch {
+          balances[acc.id] = 0;
+        }
+      }
+      setAccountBalances(balances);
+      
       setMessage("");
     } catch (error) {
       setMessage(`Ошибка загрузки аккаунтов: ${error}`);
+    }
+  };
+
+  const loadNetWorth = async () => {
+    try {
+      const worth = await api.getNetWorth();
+      setNetWorth(worth);
+    } catch (error) {
+      console.error('Ошибка загрузки Net Worth:', error);
     }
   };
 
@@ -77,6 +104,7 @@ function App() {
       setAccountName("");
       setAccountType("");
       await loadAccounts();
+      await loadNetWorth();
     } catch (error) {
       setMessage(`Ошибка создания аккаунта: ${error}`);
     }
@@ -114,6 +142,15 @@ function App() {
       setOperationAmount("");
       setOperationDescription("");
       await loadOperations(selectedAccountId);
+      
+      // Обновляем баланс аккаунта и Net Worth
+      try {
+        const newBalance = await api.getAccountBalance(selectedAccountId);
+        setAccountBalances(prev => ({ ...prev, [selectedAccountId]: newBalance }));
+        await loadNetWorth();
+      } catch (error) {
+        console.error('Ошибка обновления баланса:', error);
+      }
     } catch (error) {
       setMessage(`Ошибка добавления операции: ${error}`);
     }
@@ -147,9 +184,21 @@ function App() {
     <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h1>FAM-Core</h1>
-        <button onClick={showLog ? handleCloseLog : handleShowLog}>
-          {showLog ? 'Закрыть журнал' : 'Журнал'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div style={{ 
+            padding: '10px 15px', 
+            backgroundColor: '#f0f0f0', 
+            border: '2px solid #4CAF50', 
+            borderRadius: '8px',
+            color: '#333',
+            fontWeight: 'bold'
+          }}>
+            Net Worth: {netWorth.toFixed(2)} ₽
+          </div>
+          <button onClick={showLog ? handleCloseLog : handleShowLog}>
+            {showLog ? 'Закрыть журнал' : 'Журнал'}
+          </button>
+        </div>
       </div>
 
       {/* Сообщения */}
@@ -288,12 +337,24 @@ function App() {
                   border: '1px solid #ccc',
                   backgroundColor: selectedAccountId === account.id ? '#e0e0e0' : '#fff',
                   cursor: 'pointer',
-                  color: '#333'
+                  color: '#333',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
                 }}
               >
-                <strong>{account.name}</strong> ({account.type})
-                <br />
-                <small>ID: {account.id}, Создан: {new Date(account.created_at * 1000).toLocaleString()}</small>
+                <div>
+                  <strong>{account.name}</strong> ({account.type})
+                  <br />
+                  <small>ID: {account.id}, Создан: {new Date(account.created_at * 1000).toLocaleString()}</small>
+                </div>
+                <div style={{ 
+                  fontSize: '18px', 
+                  fontWeight: 'bold', 
+                  color: (accountBalances[account.id] || 0) >= 0 ? '#4CAF50' : '#f44336' 
+                }}>
+                  {(accountBalances[account.id] || 0).toFixed(2)} ₽
+                </div>
               </li>
             ))}
           </ul>
