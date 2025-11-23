@@ -419,6 +419,8 @@ pub fn update_db_version(path: &str, key: &str, new_version: &str) -> Result<(),
 /// - `payload_json` - JSON-снимок состояния сущности
 fn write_version_log(
     conn: &Connection,
+    path: &str,
+    db_key: &str,
     entity: &str,
     entity_id: i64,
     action: &str,
@@ -430,6 +432,7 @@ fn write_version_log(
         .map_err(|e| DbError::InitError(format!("Failed to get timestamp: {}", e)))?
         .as_secs() as i64;
     
+    // Записываем в version_log
     conn.execute(
         "INSERT INTO version_log (entity, entity_id, action, payload, ts) VALUES (?1, ?2, ?3, ?4, ?5)",
         [
@@ -439,6 +442,29 @@ fn write_version_log(
             payload_json,
             &ts.to_string(),
         ],
+    )?;
+    
+    // Получаем id вставленной записи
+    let version_id = conn.last_insert_rowid();
+    
+    // Загружаем приватный и публичный ключи из keystore
+    let private_key = load_key_from_keystore(path, db_key, "ed25519_private")?
+        .ok_or_else(|| DbError::InitError("Ed25519 private key not found in keystore".to_string()))?;
+    
+    let public_key = load_key_from_keystore(path, db_key, "ed25519_public")?
+        .ok_or_else(|| DbError::InitError("Ed25519 public key not found in keystore".to_string()))?;
+    
+    // Сериализуем payload в bytes
+    let payload_bytes = payload_json.as_bytes();
+    
+    // Подписываем payload
+    let signature = crate::crypto::sign_payload(payload_bytes, &private_key)
+        .map_err(|e| DbError::InitError(format!("Failed to sign payload: {}", e)))?;
+    
+    // Записываем подпись в version_signatures
+    conn.execute(
+        "INSERT INTO version_signatures (version_id, signature, public_key, ts) VALUES (?1, ?2, ?3, ?4)",
+        rusqlite::params![version_id, &signature, &public_key, ts],
     )?;
     
     Ok(())
@@ -476,7 +502,7 @@ pub fn create_account(path: &str, key: &str, name: String, acc_type: String) -> 
     let payload_json = serialize_entity(&account)?;
     
     // Логируем создание аккаунта
-    write_version_log(&conn, "account", account_id, "create", &payload_json)?;
+    write_version_log(&conn, path, key, "account", account_id, "create", &payload_json)?;
     
     Ok(account_id)
 }
@@ -558,7 +584,7 @@ pub fn add_operation(
     let operation_json = serialize_entity(&operation)?;
     
     // Логируем создание операции
-    write_version_log(&tx, "operation", operation_id, "create", &operation_json)?;
+    write_version_log(&tx, path, key, "operation", operation_id, "create", &operation_json)?;
     
     // Получаем текущий баланс
     let current_balance = get_current_balance(&tx, account_id)?;
@@ -586,7 +612,7 @@ pub fn add_operation(
     let state_json = serialize_entity(&state)?;
     
     // Логируем создание state
-    write_version_log(&tx, "state", state_id, "create", &state_json)?;
+    write_version_log(&tx, path, key, "state", state_id, "create", &state_json)?;
     
     // Коммитим транзакцию (включая операцию, баланс и оба лога)
     tx.commit()?;
