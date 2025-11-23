@@ -51,3 +51,63 @@ fn test_write_version_log() {
     println!("✓ Тест пройден: функция write_version_log создана и готова к использованию");
 }
 
+#[test]
+fn test_serialize_entity() {
+    println!("\n=== Тест serialize_entity ===");
+    
+    // Тестируем сериализацию Account
+    let account = db::Account {
+        id: 123,
+        name: "Тестовый счёт".to_string(),
+        acc_type: "cash".to_string(),
+        created_at: 1700000000,
+    };
+    
+    let json = db::serialize_entity(&account).expect("Account serialization failed");
+    println!("Account JSON: {}", json);
+    
+    assert!(json.contains("\"id\":123"));
+    assert!(json.contains("\"name\":\"Тестовый счёт\""));
+    assert!(json.contains("\"type\":\"cash\"")); // Проверяем rename
+    assert!(json.contains("\"created_at\":1700000000"));
+    println!("✓ Account сериализация работает");
+    
+    // Тестируем сериализацию Operation
+    let operation = db::Operation {
+        id: 456,
+        account_id: 123,
+        amount: 100.50,
+        description: "Тестовая операция".to_string(),
+        ts: 1700000100,
+    };
+    
+    let json = db::serialize_entity(&operation).expect("Operation serialization failed");
+    println!("Operation JSON: {}", json);
+    
+    assert!(json.contains("\"id\":456"));
+    assert!(json.contains("\"account_id\":123"));
+    assert!(json.contains("\"amount\":100.5"));
+    assert!(json.contains("\"description\":\"Тестовая операция\""));
+    assert!(json.contains("\"ts\":1700000100"));
+    println!("✓ Operation сериализация работает");
+    
+    // Тестируем сериализацию State
+    let state = db::State {
+        id: 789,
+        account_id: 123,
+        balance: 1234.56,
+        ts: 1700000200,
+    };
+    
+    let json = db::serialize_entity(&state).expect("State serialization failed");
+    println!("State JSON: {}", json);
+    
+    assert!(json.contains("\"id\":789"));
+    assert!(json.contains("\"account_id\":123"));
+    assert!(json.contains("\"balance\":1234.56"));
+    assert!(json.contains("\"ts\":1700000200"));
+    println!("✓ State сериализация работает");
+    
+    println!("✓ Все тесты сериализации пройдены");
+}
+

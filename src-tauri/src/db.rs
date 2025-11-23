@@ -52,6 +52,24 @@ pub struct State {
     pub ts: i64,
 }
 
+// Вспомогательные функции для сериализации
+
+/// Сериализация сущности в JSON-строку
+/// 
+/// Используется для создания payload в version_log
+/// 
+/// # Примеры
+/// 
+/// ```
+/// let account = Account { id: 1, name: "Test".to_string(), acc_type: "cash".to_string(), created_at: 123456 };
+/// let json = serialize_entity(&account).unwrap();
+/// // json = '{"id":1,"name":"Test","type":"cash","created_at":123456}'
+/// ```
+pub fn serialize_entity<T: Serialize>(entity: &T) -> Result<String, DbError> {
+    serde_json::to_string(entity)
+        .map_err(|e| DbError::InitError(format!("Serialization error: {}", e)))
+}
+
 /// Инициализация базы данных с шифрованием
 pub fn init_db(path: &str, key: &str) -> Result<(), DbError> {
     // Проверяем и создаем директорию если нужно
@@ -324,6 +342,7 @@ pub fn update_db_version(path: &str, key: &str, new_version: &str) -> Result<(),
 /// - `entity_id` - ID сущности
 /// - `action` - тип действия (create, update, delete)
 /// - `payload_json` - JSON-снимок состояния сущности
+#[allow(dead_code)] // Функция будет использоваться в следующих промптах
 fn write_version_log(
     conn: &Connection,
     entity: &str,
