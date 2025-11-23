@@ -88,6 +88,8 @@ pub fn run() {
             db::write_test_record,
             db::create_account_command,
             db::list_accounts_command,
+            db::add_operation_command,
+            db::get_operations_command,
             // Crypto commands
             crypto::generate_key,
             crypto::derive_password_key,

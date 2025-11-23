@@ -15,6 +15,21 @@ export interface Account {
   created_at: number;
 }
 
+export interface Operation {
+  id: number;
+  account_id: number;
+  amount: number;
+  description: string;
+  ts: number;
+}
+
+export interface State {
+  id: number;
+  account_id: number;
+  balance: number;
+  ts: number;
+}
+
 // Crypto types
 export interface MasterKey {
   key: number[];

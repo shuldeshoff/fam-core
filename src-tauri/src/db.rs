@@ -35,6 +35,23 @@ pub struct Account {
     pub created_at: i64,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Operation {
+    pub id: i64,
+    pub account_id: i64,
+    pub amount: f64,
+    pub description: String,
+    pub ts: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct State {
+    pub id: i64,
+    pub account_id: i64,
+    pub balance: f64,
+    pub ts: i64,
+}
+
 /// Инициализация базы данных с шифрованием
 pub fn init_db(path: &str, key: &str) -> Result<(), DbError> {
     // Проверяем и создаем директорию если нужно
@@ -301,6 +318,90 @@ pub fn list_accounts(path: &str, key: &str) -> Result<Vec<Account>, DbError> {
     Ok(accounts)
 }
 
+// Функции работы с операциями
+
+/// Получение текущего баланса счёта
+fn get_current_balance(conn: &Connection, account_id: i64) -> SqlResult<f64> {
+    let balance: Result<f64, _> = conn.query_row(
+        "SELECT balance FROM states WHERE account_id = ?1 ORDER BY ts DESC LIMIT 1",
+        [account_id],
+        |row| row.get(0),
+    );
+    
+    // Если баланса нет, начинаем с 0
+    Ok(balance.unwrap_or(0.0))
+}
+
+/// Добавление операции с автоматическим обновлением баланса
+pub fn add_operation(
+    path: &str,
+    key: &str,
+    account_id: i64,
+    amount: f64,
+    description: String,
+) -> Result<i64, DbError> {
+    let mut conn = Connection::open(path)?;
+    conn.pragma_update(None, "key", key)?;
+    
+    // Начинаем транзакцию
+    let tx = conn.transaction()?;
+    
+    // Получаем текущий timestamp
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| DbError::InitError(format!("Failed to get timestamp: {}", e)))?
+        .as_secs() as i64;
+    
+    // Вставляем операцию
+    tx.execute(
+        "INSERT INTO operations (account_id, amount, description, ts) VALUES (?1, ?2, ?3, ?4)",
+        [&account_id.to_string(), &amount.to_string(), &description, &ts.to_string()],
+    )?;
+    
+    let operation_id = tx.last_insert_rowid();
+    
+    // Получаем текущий баланс
+    let current_balance = get_current_balance(&tx, account_id)?;
+    
+    // Рассчитываем новый баланс
+    let new_balance = current_balance + amount;
+    
+    // Создаём новую запись баланса в states
+    tx.execute(
+        "INSERT INTO states (account_id, balance, ts) VALUES (?1, ?2, ?3)",
+        [&account_id.to_string(), &new_balance.to_string(), &ts.to_string()],
+    )?;
+    
+    // Коммитим транзакцию
+    tx.commit()?;
+    
+    Ok(operation_id)
+}
+
+/// Получение списка операций по счёту
+pub fn get_operations(path: &str, key: &str, account_id: i64) -> Result<Vec<Operation>, DbError> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "key", key)?;
+    
+    let mut stmt = conn.prepare(
+        "SELECT id, account_id, amount, description, ts FROM operations 
+         WHERE account_id = ?1 ORDER BY ts DESC"
+    )?;
+    
+    let operations = stmt.query_map([account_id], |row| {
+        Ok(Operation {
+            id: row.get(0)?,
+            account_id: row.get(1)?,
+            amount: row.get(2)?,
+            description: row.get(3)?,
+            ts: row.get(4)?,
+        })
+    })?
+    .collect::<Result<Vec<_>, _>>()?;
+    
+    Ok(operations)
+}
+
 // Tauri команды
 
 /// Инициализация базы данных
@@ -415,4 +516,28 @@ pub async fn create_account_command(
 pub async fn list_accounts_command(path: String, key: String) -> Result<Vec<Account>, String> {
     list_accounts(&path, &key)
         .map_err(|e| format!("Failed to list accounts: {}", e))
+}
+
+/// Добавление операции
+#[tauri::command]
+pub async fn add_operation_command(
+    path: String,
+    key: String,
+    account_id: i64,
+    amount: f64,
+    description: String,
+) -> Result<i64, String> {
+    add_operation(&path, &key, account_id, amount, description)
+        .map_err(|e| format!("Failed to add operation: {}", e))
+}
+
+/// Получение операций по счёту
+#[tauri::command]
+pub async fn get_operations_command(
+    path: String,
+    key: String,
+    account_id: i64,
+) -> Result<Vec<Operation>, String> {
+    get_operations(&path, &key, account_id)
+        .map_err(|e| format!("Failed to get operations: {}", e))
 }
