@@ -147,35 +147,33 @@ function App() {
             />
           </div>
           <div style={{ marginBottom: '10px' }}>
-            <div style={{ marginBottom: '5px', fontSize: '14px', color: '#333' }}>Тип:</div>
+            <div style={{ marginBottom: '8px', fontSize: '14px', color: '#333', fontWeight: '500' }}>Тип:</div>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              {['cash', 'card', 'bank'].map((type) => (
-                <label
-                  key={type}
+              {[
+                { value: 'cash', label: '💵 Наличные' },
+                { value: 'card', label: '💳 Карта' },
+                { value: 'bank', label: '🏦 Банк' }
+              ].map((type) => (
+                <div
+                  key={type.value}
+                  onClick={() => setAccountType(type.value)}
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '8px 16px',
+                    padding: '10px 20px',
                     border: '2px solid',
-                    borderColor: accountType === type ? '#007bff' : '#ccc',
-                    borderRadius: '20px',
-                    backgroundColor: accountType === type ? '#e7f3ff' : '#fff',
+                    borderColor: accountType === type.value ? '#007bff' : '#ddd',
+                    borderRadius: '24px',
+                    backgroundColor: accountType === type.value ? '#007bff' : '#fff',
+                    color: accountType === type.value ? '#fff' : '#333',
                     cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    color: '#333',
-                    fontWeight: accountType === type ? 'bold' : 'normal'
+                    transition: 'all 0.2s ease',
+                    userSelect: 'none',
+                    fontWeight: accountType === type.value ? '600' : '400',
+                    fontSize: '14px',
+                    boxShadow: accountType === type.value ? '0 2px 8px rgba(0,123,255,0.3)' : 'none'
                   }}
                 >
-                  <input
-                    type="radio"
-                    name="accountType"
-                    value={type}
-                    checked={accountType === type}
-                    onChange={(e) => setAccountType(e.target.value)}
-                    style={{ marginRight: '6px' }}
-                  />
-                  {type}
-                </label>
+                  {type.label}
+                </div>
               ))}
             </div>
           </div>
