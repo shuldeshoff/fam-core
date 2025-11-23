@@ -147,13 +147,37 @@ function App() {
             />
           </div>
           <div style={{ marginBottom: '10px' }}>
-            <input
-              type="text"
-              placeholder="Тип (cash, card, bank)"
-              value={accountType}
-              onChange={(e) => setAccountType(e.target.value)}
-              style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-            />
+            <div style={{ marginBottom: '5px', fontSize: '14px', color: '#333' }}>Тип:</div>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              {['cash', 'card', 'bank'].map((type) => (
+                <label
+                  key={type}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '8px 16px',
+                    border: '2px solid',
+                    borderColor: accountType === type ? '#007bff' : '#ccc',
+                    borderRadius: '20px',
+                    backgroundColor: accountType === type ? '#e7f3ff' : '#fff',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    color: '#333',
+                    fontWeight: accountType === type ? 'bold' : 'normal'
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="accountType"
+                    value={type}
+                    checked={accountType === type}
+                    onChange={(e) => setAccountType(e.target.value)}
+                    style={{ marginRight: '6px' }}
+                  />
+                  {type}
+                </label>
+              ))}
+            </div>
           </div>
           <button type="submit">Создать</button>
         </form>
