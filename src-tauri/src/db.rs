@@ -42,9 +42,67 @@ pub fn init_db(path: &str, key: &str) -> Result<(), DbError> {
     // Включаем PRAGMA key для шифрования через SQLCipher
     conn.pragma_update(None, "key", key)?;
     
-    // Выполняем миграцию: создаём таблицу meta
-    create_meta_table(&conn)?;
+    // Включаем внешние ключи
+    conn.execute("PRAGMA foreign_keys = ON", [])?;
     
+    // Выполняем миграции
+    run_migrations(&conn)?;
+    
+    Ok(())
+}
+
+/// Запуск всех миграций
+fn run_migrations(conn: &Connection) -> Result<(), DbError> {
+    // Создаём таблицу meta для отслеживания версии БД
+    create_meta_table(conn)?;
+    
+    // Получаем текущую версию
+    let version = get_current_version(conn)?;
+    
+    // Выполняем миграции по порядку
+    if version < 1 {
+        migration_v1(conn)?;
+        update_version(conn, 1)?;
+    }
+    
+    if version < 2 {
+        migration_v2_accounts(conn)?;
+        update_version(conn, 2)?;
+    }
+    
+    if version < 3 {
+        migration_v3_operations(conn)?;
+        update_version(conn, 3)?;
+    }
+    
+    if version < 4 {
+        migration_v4_states(conn)?;
+        update_version(conn, 4)?;
+    }
+    
+    Ok(())
+}
+
+/// Получение текущей версии БД
+fn get_current_version(conn: &Connection) -> Result<i32, DbError> {
+    let version: Result<String, _> = conn.query_row(
+        "SELECT version FROM meta LIMIT 1",
+        [],
+        |row| row.get(0),
+    );
+    
+    match version {
+        Ok(v) => v.parse::<i32>().map_err(|_| DbError::MigrationError("Invalid version format".to_string())),
+        Err(_) => Ok(0),
+    }
+}
+
+/// Обновление версии БД
+fn update_version(conn: &Connection, version: i32) -> SqlResult<()> {
+    conn.execute(
+        "UPDATE meta SET version = ?1",
+        [version.to_string()],
+    )?;
     Ok(())
 }
 
@@ -67,9 +125,97 @@ fn create_meta_table(conn: &Connection) -> SqlResult<()> {
     if count == 0 {
         conn.execute(
             "INSERT INTO meta (version) VALUES (?1)",
-            ["1.0.0"],
+            ["0"],
         )?;
     }
+    
+    Ok(())
+}
+
+/// Миграция v1: начальная настройка (уже выполнена через create_meta_table)
+fn migration_v1(_conn: &Connection) -> SqlResult<()> {
+    // Таблица meta уже создана, просто обновляем версию
+    Ok(())
+}
+
+/// Миграция v2: создание таблицы accounts
+fn migration_v2_accounts(conn: &Connection) -> SqlResult<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS accounts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        )",
+        [],
+    )?;
+    
+    // Создаём индексы для ускорения поиска
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_accounts_type ON accounts(type)",
+        [],
+    )?;
+    
+    Ok(())
+}
+
+/// Миграция v3: создание таблицы operations
+fn migration_v3_operations(conn: &Connection) -> SqlResult<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS operations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            description TEXT NOT NULL,
+            ts INTEGER NOT NULL,
+            FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+        )",
+        [],
+    )?;
+    
+    // Создаём индексы
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_operations_account_id ON operations(account_id)",
+        [],
+    )?;
+    
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_operations_ts ON operations(ts)",
+        [],
+    )?;
+    
+    Ok(())
+}
+
+/// Миграция v4: создание таблицы states
+fn migration_v4_states(conn: &Connection) -> SqlResult<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS states (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_id INTEGER NOT NULL,
+            balance REAL NOT NULL,
+            ts INTEGER NOT NULL,
+            FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+        )",
+        [],
+    )?;
+    
+    // Создаём индексы
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_states_account_id ON states(account_id)",
+        [],
+    )?;
+    
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_states_ts ON states(ts)",
+        [],
+    )?;
+    
+    // Уникальный индекс для предотвращения дублирования снимков
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_states_account_ts ON states(account_id, ts)",
+        [],
+    )?;
     
     Ok(())
 }
