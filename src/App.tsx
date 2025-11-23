@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "./lib/tauri-commands";
-import type { Account, Operation, VersionLogRecord } from "./types/tauri";
+import type { Account, Operation, State, AssetAllocation, VersionLogRecord } from "./types/tauri";
 import "./App.css";
 
 function App() {
@@ -29,6 +29,16 @@ function App() {
   // Балансы и Net Worth
   const [accountBalances, setAccountBalances] = useState<Record<number, number>>({});
   const [netWorth, setNetWorth] = useState<number>(0);
+  
+  // Режимы отображения
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showBalanceHistory, setShowBalanceHistory] = useState(false);
+  const [showAssetAllocation, setShowAssetAllocation] = useState(false);
+  
+  // Данные аналитики
+  const [balanceHistory, setBalanceHistory] = useState<State[]>([]);
+  const [assetAllocation, setAssetAllocation] = useState<AssetAllocation[]>([]);
+  const [selectedHistoryAccountId, setSelectedHistoryAccountId] = useState<number | null>(null);
   
   // Сообщения об ошибках/успехе
   const [message, setMessage] = useState("");
@@ -88,6 +98,47 @@ function App() {
     } catch (error) {
       setMessage(`Ошибка загрузки операций: ${error}`);
     }
+  };
+
+  const loadBalanceHistory = async (accountId: number) => {
+    try {
+      const history = await api.getBalanceHistory(accountId);
+      setBalanceHistory(history);
+      setSelectedHistoryAccountId(accountId);
+      setMessage("");
+    } catch (error) {
+      setMessage(`Ошибка загрузки истории балансов: ${error}`);
+    }
+  };
+
+  const loadAssetAllocation = async () => {
+    try {
+      const allocation = await api.getAssetAllocation();
+      setAssetAllocation(allocation);
+      setMessage("");
+    } catch (error) {
+      setMessage(`Ошибка загрузки структуры активов: ${error}`);
+    }
+  };
+
+  const handleShowAnalytics = async () => {
+    setShowLog(false);
+    setShowAnalytics(true);
+    await loadNetWorth();
+    await loadAssetAllocation();
+  };
+
+  const handleCloseAnalytics = () => {
+    setShowAnalytics(false);
+    setShowBalanceHistory(false);
+    setShowAssetAllocation(false);
+    setBalanceHistory([]);
+    setSelectedHistoryAccountId(null);
+  };
+
+  const handleShowBalanceHistory = async (accountId: number) => {
+    setShowBalanceHistory(true);
+    await loadBalanceHistory(accountId);
   };
 
   const handleCreateAccount = async (e: React.FormEvent) => {
@@ -195,6 +246,9 @@ function App() {
           }}>
             Net Worth: {netWorth.toFixed(2)} ₽
           </div>
+          <button onClick={showAnalytics ? handleCloseAnalytics : handleShowAnalytics}>
+            {showAnalytics ? 'Закрыть аналитику' : 'Аналитика'}
+          </button>
           <button onClick={showLog ? handleCloseLog : handleShowLog}>
             {showLog ? 'Закрыть журнал' : 'Журнал'}
           </button>
@@ -214,8 +268,137 @@ function App() {
         </div>
       )}
 
-      {/* Режим просмотра журнала */}
-      {showLog ? (
+      {/* Режим аналитики */}
+      {showAnalytics ? (
+        <section style={{ padding: '15px', border: '1px solid #ddd' }}>
+          <h2>Аналитика</h2>
+          
+          {/* Net Worth */}
+          <div style={{ 
+            marginBottom: '30px', 
+            padding: '15px', 
+            backgroundColor: '#f9f9f9', 
+            border: '2px solid #4CAF50',
+            borderRadius: '8px'
+          }}>
+            <h3>Net Worth</h3>
+            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#4CAF50' }}>
+              {netWorth.toFixed(2)} ₽
+            </div>
+          </div>
+
+          {/* Структура активов */}
+          <div style={{ marginBottom: '30px', padding: '15px', border: '1px solid #ddd' }}>
+            <h3>Структура активов</h3>
+            {assetAllocation.length === 0 ? (
+              <p>Нет данных о структуре активов</p>
+            ) : (
+              <div>
+                {assetAllocation.map((allocation) => (
+                  <div 
+                    key={allocation.type}
+                    style={{
+                      padding: '10px',
+                      marginBottom: '5px',
+                      border: '1px solid #ccc',
+                      backgroundColor: '#fff',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      color: '#333'
+                    }}
+                  >
+                    <div>
+                      <strong>{allocation.type}</strong>
+                      <br />
+                      <small>Аккаунтов: {allocation.account_count}</small>
+                    </div>
+                    <div style={{ 
+                      fontSize: '18px', 
+                      fontWeight: 'bold',
+                      color: allocation.total_balance >= 0 ? '#4CAF50' : '#f44336'
+                    }}>
+                      {allocation.total_balance.toFixed(2)} ₽
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Временной ряд балансов */}
+          <div style={{ marginBottom: '30px', padding: '15px', border: '1px solid #ddd' }}>
+            <h3>Временной ряд балансов</h3>
+            
+            {/* Выбор аккаунта */}
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', color: '#333' }}>
+                Выберите аккаунт:
+              </label>
+              <select 
+                value={selectedHistoryAccountId || ''}
+                onChange={(e) => {
+                  const accountId = parseInt(e.target.value);
+                  if (!isNaN(accountId)) {
+                    handleShowBalanceHistory(accountId);
+                  }
+                }}
+                style={{ width: '100%', padding: '8px' }}
+              >
+                <option value="">-- Выберите аккаунт --</option>
+                {accounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.name} ({acc.type})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Список истории балансов */}
+            {showBalanceHistory ? (
+              balanceHistory.length === 0 ? (
+                <p>Нет истории балансов для этого аккаунта</p>
+              ) : (
+                <div>
+                  <p style={{ marginBottom: '10px', color: '#333' }}>
+                    Найдено записей: {balanceHistory.length}
+                  </p>
+                  <ul style={{ listStyle: 'none', padding: 0 }}>
+                    {balanceHistory.map((state, index) => (
+                      <li 
+                        key={state.id}
+                        style={{
+                          padding: '8px',
+                          marginBottom: '3px',
+                          border: '1px solid #ddd',
+                          backgroundColor: index % 2 === 0 ? '#fff' : '#f9f9f9',
+                          color: '#333',
+                          fontSize: '14px',
+                          display: 'flex',
+                          justifyContent: 'space-between'
+                        }}
+                      >
+                        <span>
+                          <strong>ts:</strong> {state.ts} ({new Date(state.ts * 1000).toLocaleString()})
+                        </span>
+                        <span style={{ 
+                          fontWeight: 'bold',
+                          color: state.balance >= 0 ? '#4CAF50' : '#f44336'
+                        }}>
+                          balance: {state.balance.toFixed(2)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            ) : (
+              <p style={{ color: '#666' }}>Выберите аккаунт для просмотра истории</p>
+            )}
+          </div>
+        </section>
+      ) : showLog ? (
+        {/* Режим просмотра журнала */}
         <section style={{ padding: '15px', border: '1px solid #ddd' }}>
           <h2>Журнал изменений ({versionLog.length})</h2>
           {versionLog.length === 0 ? (
