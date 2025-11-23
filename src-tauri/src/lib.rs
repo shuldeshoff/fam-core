@@ -95,6 +95,9 @@ pub fn run() {
             crypto::derive_password_key,
             crypto::verify_password_key,
             crypto::get_crypto_config,
+            crypto::generate_ed25519_keys,
+            crypto::sign_with_ed25519,
+            crypto::verify_ed25519_signature,
             // API commands (high-level without path/key)
             api::create_account,
             api::list_accounts,

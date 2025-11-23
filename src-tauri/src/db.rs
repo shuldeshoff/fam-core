@@ -110,6 +110,9 @@ pub fn init_db(path: &str, key: &str) -> Result<(), DbError> {
     // Выполняем миграции
     run_migrations(&conn)?;
     
+    // Генерируем Ed25519 ключи при первом запуске
+    ensure_ed25519_keys(path, key)?;
+    
     Ok(())
 }
 
@@ -145,6 +148,11 @@ fn run_migrations(conn: &Connection) -> Result<(), DbError> {
     if version < 5 {
         migration_v5_version_log(conn)?;
         update_version(conn, 5)?;
+    }
+    
+    if version < 6 {
+        migration_v6_keystore(conn)?;
+        update_version(conn, 6)?;
     }
     
     Ok(())
@@ -318,6 +326,21 @@ fn migration_v5_version_log(conn: &Connection) -> SqlResult<()> {
         [],
     )?;
     
+    Ok(())
+}
+
+/// Миграция M6: Таблица keystore для хранения криптографических ключей
+fn migration_v6_keystore(conn: &Connection) -> SqlResult<()> {
+    // Создаём таблицу keystore для хранения ключей
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS keystore (
+            key TEXT PRIMARY KEY,
+            value BLOB NOT NULL
+        )",
+        [],
+    )?;
+    
+    // Индекс уже есть благодаря PRIMARY KEY
     Ok(())
 }
 
@@ -696,6 +719,129 @@ pub fn get_asset_allocation(
     .collect::<Result<Vec<_>, _>>()?;
     
     Ok(allocations)
+}
+
+// Функции для работы с keystore
+
+/// Сохранение ключа в keystore
+/// 
+/// # Параметры
+/// - `path` - путь к базе данных
+/// - `db_key` - ключ шифрования БД
+/// - `key_name` - имя ключа (например, "ed25519_private", "ed25519_public")
+/// - `key_value` - значение ключа в виде байтов
+pub fn save_key_to_keystore(
+    path: &str,
+    db_key: &str,
+    key_name: &str,
+    key_value: &[u8],
+) -> Result<(), DbError> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "key", db_key)?;
+    
+    conn.execute(
+        "INSERT OR REPLACE INTO keystore (key, value) VALUES (?1, ?2)",
+        rusqlite::params![key_name, key_value],
+    )?;
+    
+    Ok(())
+}
+
+/// Загрузка ключа из keystore
+/// 
+/// # Параметры
+/// - `path` - путь к базе данных
+/// - `db_key` - ключ шифрования БД
+/// - `key_name` - имя ключа
+pub fn load_key_from_keystore(
+    path: &str,
+    db_key: &str,
+    key_name: &str,
+) -> Result<Option<Vec<u8>>, DbError> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "key", db_key)?;
+    
+    let result: Result<Vec<u8>, rusqlite::Error> = conn.query_row(
+        "SELECT value FROM keystore WHERE key = ?1",
+        [key_name],
+        |row| row.get(0),
+    );
+    
+    match result {
+        Ok(value) => Ok(Some(value)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(DbError::SqliteError(e)),
+    }
+}
+
+/// Проверка существования ключа в keystore
+/// 
+/// # Параметры
+/// - `path` - путь к базе данных
+/// - `db_key` - ключ шифрования БД
+/// - `key_name` - имя ключа
+pub fn key_exists_in_keystore(
+    path: &str,
+    db_key: &str,
+    key_name: &str,
+) -> Result<bool, DbError> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "key", db_key)?;
+    
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM keystore WHERE key = ?1",
+        [key_name],
+        |row| row.get(0),
+    )?;
+    
+    Ok(count > 0)
+}
+
+/// Удаление ключа из keystore
+/// 
+/// # Параметры
+/// - `path` - путь к базе данных
+/// - `db_key` - ключ шифрования БД
+/// - `key_name` - имя ключа
+pub fn delete_key_from_keystore(
+    path: &str,
+    db_key: &str,
+    key_name: &str,
+) -> Result<(), DbError> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "key", db_key)?;
+    
+    conn.execute(
+        "DELETE FROM keystore WHERE key = ?1",
+        [key_name],
+    )?;
+    
+    Ok(())
+}
+
+/// Генерация и сохранение Ed25519 ключей при первом запуске
+/// 
+/// # Параметры
+/// - `path` - путь к базе данных
+/// - `db_key` - ключ шифрования БД
+pub fn ensure_ed25519_keys(path: &str, db_key: &str) -> Result<(), DbError> {
+    // Проверяем существование приватного ключа
+    let private_exists = key_exists_in_keystore(path, db_key, "ed25519_private")?;
+    let public_exists = key_exists_in_keystore(path, db_key, "ed25519_public")?;
+    
+    if !private_exists || !public_exists {
+        // Генерируем новую пару ключей
+        let keypair = crate::crypto::generate_ed25519_keypair()
+            .map_err(|e| DbError::InitError(format!("Failed to generate Ed25519 keys: {}", e)))?;
+        
+        // Сохраняем в keystore
+        save_key_to_keystore(path, db_key, "ed25519_private", &keypair.private_key)?;
+        save_key_to_keystore(path, db_key, "ed25519_public", &keypair.public_key)?;
+        
+        println!("✓ Generated and saved new Ed25519 keypair to keystore");
+    }
+    
+    Ok(())
 }
 
 /// Получение записей из version_log с опциональными фильтрами

@@ -26,4 +26,5 @@ rusqlite = { version = "0.32", features = ["bundled-sqlcipher"] }
 thiserror = "2.0"
 argon2 = "0.5"
 rand = "0.8"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 
