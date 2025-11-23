@@ -171,6 +171,41 @@ pub fn verify_signature(
     }
 }
 
+// Удобные обёртки для работы с payload
+
+/// Подпись payload приватным ключом
+/// 
+/// Удобная обёртка над sign_data с более понятными именами параметров
+/// 
+/// # Параметры
+/// - `payload` - данные для подписи
+/// - `private_key` - приватный ключ Ed25519 (32 байта)
+/// 
+/// # Возвращает
+/// - `Vec<u8>` - подпись (64 байта)
+pub fn sign_payload(payload: &[u8], private_key: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    sign_data(private_key, payload)
+}
+
+/// Верификация подписи payload
+/// 
+/// Удобная обёртка над verify_signature с более понятным порядком параметров
+/// 
+/// # Параметры
+/// - `payload` - данные которые были подписаны
+/// - `signature` - подпись для проверки (64 байта)
+/// - `public_key` - публичный ключ Ed25519 (32 байта)
+/// 
+/// # Возвращает
+/// - `bool` - true если подпись валидна, false иначе
+pub fn verify_payload(
+    payload: &[u8],
+    signature: &[u8],
+    public_key: &[u8],
+) -> Result<bool, CryptoError> {
+    verify_signature(public_key, payload, signature)
+}
+
 // Tauri команды
 
 /// Генерация мастер-ключа
@@ -230,4 +265,22 @@ pub async fn verify_ed25519_signature(
 ) -> Result<bool, String> {
     verify_signature(&public_key, &data, &signature)
         .map_err(|e| format!("Failed to verify signature: {}", e))
+}
+
+/// Подпись payload (обёртка для удобства)
+#[tauri::command]
+pub async fn sign_payload_command(payload: Vec<u8>, private_key: Vec<u8>) -> Result<Vec<u8>, String> {
+    sign_payload(&payload, &private_key)
+        .map_err(|e| format!("Failed to sign payload: {}", e))
+}
+
+/// Верификация подписи payload (обёртка для удобства)
+#[tauri::command]
+pub async fn verify_payload_command(
+    payload: Vec<u8>,
+    signature: Vec<u8>,
+    public_key: Vec<u8>,
+) -> Result<bool, String> {
+    verify_payload(&payload, &signature, &public_key)
+        .map_err(|e| format!("Failed to verify payload: {}", e))
 }
