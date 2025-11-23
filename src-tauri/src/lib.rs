@@ -24,11 +24,23 @@ fn get_db_path(app: tauri::AppHandle) -> Result<String, String> {
 /// Инициализация приложения
 fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // Получаем путь к директории данных приложения
-    let app_data_dir = app.path().app_data_dir()?;
+    let app_data_dir = match app.path().app_data_dir() {
+        Ok(dir) => dir,
+        Err(e) => {
+            eprintln!("Warning: Failed to get app data dir: {}", e);
+            // Используем fallback путь
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            std::path::PathBuf::from(home).join(".fam-core")
+        }
+    };
     
     // Создаём директорию если её нет
     if !app_data_dir.exists() {
-        std::fs::create_dir_all(&app_data_dir)?;
+        if let Err(e) = std::fs::create_dir_all(&app_data_dir) {
+            eprintln!("Warning: Failed to create directory: {}", e);
+            // Не прерываем запуск приложения
+            return Ok(());
+        }
     }
     
     // Путь к базе данных
@@ -44,8 +56,8 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             println!("Database initialized at: {}", db_path_str);
         }
         Err(e) => {
-            eprintln!("Failed to initialize database: {}", e);
-            return Err(Box::new(e));
+            eprintln!("Warning: Failed to initialize database: {}", e);
+            // Не прерываем запуск - БД будет инициализирована при первом использовании
         }
     }
     
@@ -57,7 +69,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            setup_app(app)?;
+            // Не паникуем при ошибке setup - просто логируем
+            if let Err(e) = setup_app(app) {
+                eprintln!("Setup warning: {}", e);
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
