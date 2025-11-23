@@ -78,7 +78,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             get_db_path,
-            // Database commands
+            // Database commands (low-level with path/key)
             db::init_database,
             db::check_connection,
             db::execute_query,
@@ -95,7 +95,11 @@ pub fn run() {
             crypto::derive_password_key,
             crypto::verify_password_key,
             crypto::get_crypto_config,
-            // API commands
+            // API commands (high-level without path/key)
+            api::create_account,
+            api::list_accounts,
+            api::add_operation,
+            api::get_operations,
             api::make_request,
             api::fetch_data,
             api::post_data,

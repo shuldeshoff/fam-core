@@ -8,7 +8,7 @@ export const app = {
   },
 };
 
-// Database commands
+// Database commands (low-level with path/key)
 export const db = {
   async initDatabase(path: string, key: string): Promise<DbResult> {
     return await invoke('init_database', { path, key });
@@ -55,6 +55,40 @@ export const db = {
   },
 };
 
+// API commands (high-level without path/key)
+export const api = {
+  // Account management
+  async createAccount(name: string, accType: string): Promise<number> {
+    return await invoke('create_account', { name, accType });
+  },
+
+  async listAccounts(): Promise<Account[]> {
+    return await invoke('list_accounts');
+  },
+
+  // Operations management
+  async addOperation(accountId: number, amount: number, description: string): Promise<number> {
+    return await invoke('add_operation', { accountId, amount, description });
+  },
+
+  async getOperations(accountId: number): Promise<Operation[]> {
+    return await invoke('get_operations', { accountId });
+  },
+
+  // HTTP requests
+  async makeRequest(request: ApiRequest): Promise<ApiResponse> {
+    return await invoke('make_request', { request });
+  },
+
+  async fetchData(url: string): Promise<string> {
+    return await invoke('fetch_data', { url });
+  },
+
+  async postData(url: string, data: string): Promise<ApiResponse> {
+    return await invoke('post_data', { url, data });
+  },
+};
+
 // Crypto commands
 export const crypto = {
   async generateKey(): Promise<MasterKey> {
@@ -71,21 +105,6 @@ export const crypto = {
 
   async getCryptoConfig(): Promise<CryptoConfig> {
     return await invoke('get_crypto_config');
-  },
-};
-
-// API commands
-export const api = {
-  async makeRequest(request: ApiRequest): Promise<ApiResponse> {
-    return await invoke('make_request', { request });
-  },
-
-  async fetchData(url: string): Promise<string> {
-    return await invoke('fetch_data', { url });
-  },
-
-  async postData(url: string, data: string): Promise<ApiResponse> {
-    return await invoke('post_data', { url, data });
   },
 };
 
