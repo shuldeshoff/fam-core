@@ -26,6 +26,15 @@ pub struct DbResult {
     pub message: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Account {
+    pub id: i64,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub acc_type: String,
+    pub created_at: i64,
+}
+
 /// Инициализация базы данных с шифрованием
 pub fn init_db(path: &str, key: &str) -> Result<(), DbError> {
     // Проверяем и создаем директорию если нужно
@@ -247,6 +256,51 @@ pub fn update_db_version(path: &str, key: &str, new_version: &str) -> Result<(),
     Ok(())
 }
 
+// Функции работы со счетами
+
+/// Создание нового счёта
+pub fn create_account(path: &str, key: &str, name: String, acc_type: String) -> Result<i64, DbError> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "key", key)?;
+    
+    // Получаем текущий timestamp в секундах
+    let created_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| DbError::InitError(format!("Failed to get timestamp: {}", e)))?
+        .as_secs() as i64;
+    
+    conn.execute(
+        "INSERT INTO accounts (name, type, created_at) VALUES (?1, ?2, ?3)",
+        [&name, &acc_type, &created_at.to_string()],
+    )?;
+    
+    let account_id = conn.last_insert_rowid();
+    
+    Ok(account_id)
+}
+
+/// Получение списка всех счетов
+pub fn list_accounts(path: &str, key: &str) -> Result<Vec<Account>, DbError> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "key", key)?;
+    
+    let mut stmt = conn.prepare(
+        "SELECT id, name, type, created_at FROM accounts ORDER BY created_at DESC"
+    )?;
+    
+    let accounts = stmt.query_map([], |row| {
+        Ok(Account {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            acc_type: row.get(2)?,
+            created_at: row.get(3)?,
+        })
+    })?
+    .collect::<Result<Vec<_>, _>>()?;
+    
+    Ok(accounts)
+}
+
 // Tauri команды
 
 /// Инициализация базы данных
@@ -342,4 +396,23 @@ pub async fn write_test_record(path: String, key: String, value: String) -> Resu
     .map_err(|e| format!("Failed to write test record: {}", e))?;
     
     Ok(())
+}
+
+/// Создание нового счёта
+#[tauri::command]
+pub async fn create_account_command(
+    path: String,
+    key: String,
+    name: String,
+    acc_type: String,
+) -> Result<i64, String> {
+    create_account(&path, &key, name, acc_type)
+        .map_err(|e| format!("Failed to create account: {}", e))
+}
+
+/// Получение списка счетов
+#[tauri::command]
+pub async fn list_accounts_command(path: String, key: String) -> Result<Vec<Account>, String> {
+    list_accounts(&path, &key)
+        .map_err(|e| format!("Failed to list accounts: {}", e))
 }

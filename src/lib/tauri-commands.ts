@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { DbResult, MasterKey, DerivedKey, CryptoConfig, ApiRequest, ApiResponse } from '../types/tauri';
+import type { DbResult, Account, MasterKey, DerivedKey, CryptoConfig, ApiRequest, ApiResponse } from '../types/tauri';
 
 // Utility commands
 export const app = {
@@ -36,6 +36,14 @@ export const db = {
 
   async writeTestRecord(path: string, key: string, value: string): Promise<void> {
     return await invoke('write_test_record', { path, key, value });
+  },
+
+  async createAccount(path: string, key: string, name: string, accType: string): Promise<number> {
+    return await invoke('create_account_command', { path, key, name, accType });
+  },
+
+  async listAccounts(path: string, key: string): Promise<Account[]> {
+    return await invoke('list_accounts_command', { path, key });
   },
 };
 

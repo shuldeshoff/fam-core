@@ -8,6 +8,13 @@ export interface DbResult {
   message: string;
 }
 
+export interface Account {
+  id: number;
+  name: string;
+  type: string;
+  created_at: number;
+}
+
 // Crypto types
 export interface MasterKey {
   key: number[];

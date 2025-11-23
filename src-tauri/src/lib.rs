@@ -86,6 +86,8 @@ pub fn run() {
             db::set_version,
             db::get_status,
             db::write_test_record,
+            db::create_account_command,
+            db::list_accounts_command,
             // Crypto commands
             crypto::generate_key,
             crypto::derive_password_key,
