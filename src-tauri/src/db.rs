@@ -52,6 +52,16 @@ pub struct State {
     pub ts: i64,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VersionLogRecord {
+    pub id: i64,
+    pub entity: String,
+    pub entity_id: i64,
+    pub action: String,
+    pub payload: String,
+    pub ts: i64,
+}
+
 // Вспомогательные функции для сериализации
 
 /// Сериализация сущности в JSON-строку
@@ -541,6 +551,106 @@ pub fn get_operations(path: &str, key: &str, account_id: i64) -> Result<Vec<Oper
     .collect::<Result<Vec<_>, _>>()?;
     
     Ok(operations)
+}
+
+/// Получение записей из version_log с опциональными фильтрами
+/// 
+/// # Параметры
+/// - `path` - путь к базе данных
+/// - `key` - ключ шифрования
+/// - `entity` - фильтр по типу сущности (account, operation, state)
+/// - `entity_id` - фильтр по ID сущности
+pub fn list_version_log(
+    path: &str,
+    key: &str,
+    entity: Option<String>,
+    entity_id: Option<i64>,
+) -> Result<Vec<VersionLogRecord>, DbError> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "key", key)?;
+    
+    // Строим запрос динамически в зависимости от фильтров
+    let mut query = String::from("SELECT id, entity, entity_id, action, payload, ts FROM version_log");
+    let mut conditions = Vec::new();
+    
+    if entity.is_some() {
+        conditions.push("entity = ?1");
+    }
+    
+    if entity_id.is_some() {
+        if entity.is_some() {
+            conditions.push("entity_id = ?2");
+        } else {
+            conditions.push("entity_id = ?1");
+        }
+    }
+    
+    if !conditions.is_empty() {
+        query.push_str(" WHERE ");
+        query.push_str(&conditions.join(" AND "));
+    }
+    
+    query.push_str(" ORDER BY ts DESC, id DESC");
+    
+    let mut stmt = conn.prepare(&query)?;
+    
+    // Выполняем запрос с нужными параметрами
+    let records = match (&entity, &entity_id) {
+        (Some(e), Some(eid)) => {
+            stmt.query_map([e.as_str(), &eid.to_string()], |row| {
+                Ok(VersionLogRecord {
+                    id: row.get(0)?,
+                    entity: row.get(1)?,
+                    entity_id: row.get(2)?,
+                    action: row.get(3)?,
+                    payload: row.get(4)?,
+                    ts: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?
+        },
+        (Some(e), None) => {
+            stmt.query_map([e.as_str()], |row| {
+                Ok(VersionLogRecord {
+                    id: row.get(0)?,
+                    entity: row.get(1)?,
+                    entity_id: row.get(2)?,
+                    action: row.get(3)?,
+                    payload: row.get(4)?,
+                    ts: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?
+        },
+        (None, Some(eid)) => {
+            stmt.query_map([&eid.to_string()], |row| {
+                Ok(VersionLogRecord {
+                    id: row.get(0)?,
+                    entity: row.get(1)?,
+                    entity_id: row.get(2)?,
+                    action: row.get(3)?,
+                    payload: row.get(4)?,
+                    ts: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?
+        },
+        (None, None) => {
+            stmt.query_map([], |row| {
+                Ok(VersionLogRecord {
+                    id: row.get(0)?,
+                    entity: row.get(1)?,
+                    entity_id: row.get(2)?,
+                    action: row.get(3)?,
+                    payload: row.get(4)?,
+                    ts: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?
+        },
+    };
+    
+    Ok(records)
 }
 
 // Tauri команды

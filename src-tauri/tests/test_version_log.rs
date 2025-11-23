@@ -224,3 +224,82 @@ fn test_add_operation_logging() {
     std::fs::remove_file(test_db_path).unwrap();
 }
 
+#[test]
+fn test_list_version_log() {
+    let test_db_path = "/tmp/test_list_versions.db";
+    let test_key = "test_key_list";
+    
+    // Удаляем старую БД
+    if PathBuf::from(test_db_path).exists() {
+        std::fs::remove_file(test_db_path).unwrap();
+    }
+    
+    println!("\n=== Тест list_version_log с фильтрами ===");
+    
+    // Инициализируем БД
+    db::init_db(test_db_path, test_key).expect("DB init failed");
+    
+    // Создаём 2 аккаунта
+    let account1_id = db::create_account(test_db_path, test_key, "Account 1".to_string(), "cash".to_string()).unwrap();
+    let _account2_id = db::create_account(test_db_path, test_key, "Account 2".to_string(), "card".to_string()).unwrap();
+    
+    // Добавляем операцию для account1
+    db::add_operation(test_db_path, test_key, account1_id, 100.0, "Op 1".to_string()).unwrap();
+    
+    println!("✓ Созданы 2 аккаунта и 1 операция");
+    
+    // Тест 1: Получение всех записей (без фильтров)
+    let all_records = db::list_version_log(test_db_path, test_key, None, None).unwrap();
+    println!("\n1. Все записи: {}", all_records.len());
+    // 2 accounts + 1 operation + 1 state = 4 записи
+    assert_eq!(all_records.len(), 4, "Должно быть 4 записи");
+    
+    // Проверяем сортировку (по ts DESC, id DESC)
+    for (i, record) in all_records.iter().enumerate() {
+        println!("  [{}] entity={}, entity_id={}, action={}", i, record.entity, record.entity_id, record.action);
+    }
+    
+    // Тест 2: Фильтр по entity = "account"
+    let account_records = db::list_version_log(test_db_path, test_key, Some("account".to_string()), None).unwrap();
+    println!("\n2. Записи с entity='account': {}", account_records.len());
+    assert_eq!(account_records.len(), 2, "Должно быть 2 записи account");
+    for record in &account_records {
+        assert_eq!(record.entity, "account");
+    }
+    
+    // Тест 3: Фильтр по entity = "operation"
+    let operation_records = db::list_version_log(test_db_path, test_key, Some("operation".to_string()), None).unwrap();
+    println!("\n3. Записи с entity='operation': {}", operation_records.len());
+    assert_eq!(operation_records.len(), 1, "Должна быть 1 запись operation");
+    assert_eq!(operation_records[0].entity, "operation");
+    
+    // Тест 4: Фильтр по entity = "state"
+    let state_records = db::list_version_log(test_db_path, test_key, Some("state".to_string()), None).unwrap();
+    println!("\n4. Записи с entity='state': {}", state_records.len());
+    assert_eq!(state_records.len(), 1, "Должна быть 1 запись state");
+    
+    // Тест 5: Фильтр по entity_id (для account1)
+    let account1_records = db::list_version_log(test_db_path, test_key, None, Some(account1_id)).unwrap();
+    println!("\n5. Записи с entity_id={}: {}", account1_id, account1_records.len());
+    // 1 account + 1 operation + 1 state = 3 записи для account1
+    assert_eq!(account1_records.len(), 3, "Должно быть 3 записи для account1");
+    
+    // Тест 6: Фильтр по entity="account" И entity_id=account1_id
+    let specific_records = db::list_version_log(
+        test_db_path, 
+        test_key, 
+        Some("account".to_string()), 
+        Some(account1_id)
+    ).unwrap();
+    println!("\n6. Записи с entity='account' AND entity_id={}: {}", account1_id, specific_records.len());
+    assert_eq!(specific_records.len(), 1, "Должна быть 1 запись");
+    assert_eq!(specific_records[0].entity, "account");
+    assert_eq!(specific_records[0].entity_id, account1_id);
+    assert!(specific_records[0].payload.contains("Account 1"));
+    
+    println!("\n✓ Все тесты фильтрации пройдены");
+    
+    // Очистка
+    std::fs::remove_file(test_db_path).unwrap();
+}
+

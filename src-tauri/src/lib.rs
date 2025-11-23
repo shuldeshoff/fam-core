@@ -100,6 +100,7 @@ pub fn run() {
             api::list_accounts,
             api::add_operation,
             api::get_operations,
+            api::list_versions,
             api::make_request,
             api::fetch_data,
             api::post_data,

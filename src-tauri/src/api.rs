@@ -75,6 +75,24 @@ pub async fn get_operations(
         .map_err(|e| format!("Failed to get operations: {}", e))
 }
 
+/// Получение записей из журнала версий с фильтрами
+/// 
+/// # Параметры
+/// - `entity` - фильтр по типу сущности (account, operation, state)
+/// - `entity_id` - фильтр по ID сущности
+/// 
+/// Оба параметра опциональны. Если не указаны - возвращаются все записи.
+#[tauri::command]
+pub async fn list_versions(
+    app: tauri::AppHandle,
+    entity: Option<String>,
+    entity_id: Option<i64>,
+) -> Result<Vec<db::VersionLogRecord>, String> {
+    let (db_path, key) = get_db_config(app)?;
+    db::list_version_log(&db_path, &key, entity, entity_id)
+        .map_err(|e| format!("Failed to list versions: {}", e))
+}
+
 // HTTP команды (заглушки)
 
 /// Выполнение HTTP запроса

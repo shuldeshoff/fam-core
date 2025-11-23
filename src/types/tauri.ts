@@ -30,6 +30,15 @@ export interface State {
   ts: number;
 }
 
+export interface VersionLogRecord {
+  id: number;
+  entity: string;
+  entity_id: number;
+  action: string;
+  payload: string;
+  ts: number;
+}
+
 // Crypto types
 export interface MasterKey {
   key: number[];

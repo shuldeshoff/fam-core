@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { DbResult, Account, Operation, MasterKey, DerivedKey, CryptoConfig, ApiRequest, ApiResponse } from '../types/tauri';
+import type { DbResult, Account, Operation, MasterKey, DerivedKey, CryptoConfig, ApiRequest, ApiResponse, VersionLogRecord } from '../types/tauri';
 
 // Utility commands
 export const app = {
@@ -73,6 +73,14 @@ export const api = {
 
   async getOperations(accountId: number): Promise<Operation[]> {
     return await invoke('get_operations', { accountId });
+  },
+
+  // Version log
+  async listVersions(entity?: string, entityId?: number): Promise<VersionLogRecord[]> {
+    return await invoke('list_versions', { 
+      entity: entity || null, 
+      entityId: entityId !== undefined ? entityId : null 
+    });
   },
 
   // HTTP requests
