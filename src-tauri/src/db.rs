@@ -470,6 +470,21 @@ pub fn add_operation(
     
     let operation_id = tx.last_insert_rowid();
     
+    // Создаём объект Operation для логирования
+    let operation = Operation {
+        id: operation_id,
+        account_id,
+        amount,
+        description: description.clone(),
+        ts,
+    };
+    
+    // Сериализуем операцию в JSON
+    let operation_json = serialize_entity(&operation)?;
+    
+    // Логируем создание операции
+    write_version_log(&tx, "operation", operation_id, "create", &operation_json)?;
+    
     // Получаем текущий баланс
     let current_balance = get_current_balance(&tx, account_id)?;
     
@@ -482,7 +497,23 @@ pub fn add_operation(
         [&account_id.to_string(), &new_balance.to_string(), &ts.to_string()],
     )?;
     
-    // Коммитим транзакцию
+    let state_id = tx.last_insert_rowid();
+    
+    // Создаём объект State для логирования
+    let state = State {
+        id: state_id,
+        account_id,
+        balance: new_balance,
+        ts,
+    };
+    
+    // Сериализуем state в JSON
+    let state_json = serialize_entity(&state)?;
+    
+    // Логируем создание state
+    write_version_log(&tx, "state", state_id, "create", &state_json)?;
+    
+    // Коммитим транзакцию (включая операцию, баланс и оба лога)
     tx.commit()?;
     
     Ok(operation_id)

@@ -128,3 +128,99 @@ fn test_serialize_entity() {
     println!("✓ Все тесты сериализации пройдены");
 }
 
+#[test]
+fn test_add_operation_logging() {
+    use rusqlite::Connection;
+    
+    let test_db_path = "/tmp/test_operation_log.db";
+    let test_key = "test_key_op_log";
+    
+    // Удаляем старую БД
+    if PathBuf::from(test_db_path).exists() {
+        std::fs::remove_file(test_db_path).unwrap();
+    }
+    
+    println!("\n=== Тест логирования add_operation ===");
+    
+    // Инициализируем БД
+    db::init_db(test_db_path, test_key).expect("DB init failed");
+    println!("✓ База данных инициализирована");
+    
+    // Создаём аккаунт
+    let account_id = db::create_account(
+        test_db_path,
+        test_key,
+        "Test Account".to_string(),
+        "cash".to_string(),
+    ).expect("Account creation failed");
+    println!("✓ Аккаунт создан с ID: {}", account_id);
+    
+    // Добавляем операцию
+    let operation_id = db::add_operation(
+        test_db_path,
+        test_key,
+        account_id,
+        100.50,
+        "Тестовая операция".to_string(),
+    ).expect("Operation creation failed");
+    println!("✓ Операция создана с ID: {}", operation_id);
+    
+    // Проверяем записи в version_log
+    let conn = Connection::open(test_db_path).unwrap();
+    conn.pragma_update(None, "key", test_key).unwrap();
+    
+    let log_count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM version_log",
+        [],
+        |row| row.get(0),
+    ).unwrap();
+    
+    println!("Всего записей в version_log: {}", log_count);
+    
+    // Должно быть 3 записи: 1 account + 1 operation + 1 state
+    assert_eq!(log_count, 3, "Должно быть 3 записи: account, operation, state");
+    
+    // Проверяем запись operation
+    let (entity, entity_id, action, payload): (String, i64, String, String) = conn.query_row(
+        "SELECT entity, entity_id, action, payload FROM version_log WHERE entity = 'operation'",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+    ).unwrap();
+    
+    println!("\n✓ Запись operation в version_log:");
+    println!("  entity: {}", entity);
+    println!("  entity_id: {}", entity_id);
+    println!("  action: {}", action);
+    println!("  payload: {}", payload);
+    
+    assert_eq!(entity, "operation");
+    assert_eq!(entity_id, operation_id);
+    assert_eq!(action, "create");
+    assert!(payload.contains("\"amount\":100.5"));
+    assert!(payload.contains("\"description\":\"Тестовая операция\""));
+    
+    // Проверяем запись state
+    let (state_entity, state_entity_id, state_action, state_payload): (String, i64, String, String) = conn.query_row(
+        "SELECT entity, entity_id, action, payload FROM version_log WHERE entity = 'state'",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+    ).unwrap();
+    
+    println!("\n✓ Запись state в version_log:");
+    println!("  entity: {}", state_entity);
+    println!("  entity_id: {}", state_entity_id);
+    println!("  action: {}", state_action);
+    println!("  payload: {}", state_payload);
+    
+    assert_eq!(state_entity, "state");
+    assert_eq!(state_action, "create");
+    assert!(state_payload.contains("\"balance\":100.5"));
+    assert!(state_payload.contains(&format!("\"account_id\":{}", account_id)));
+    
+    println!("\n✓ Все проверки пройдены");
+    println!("✓ add_operation логирует и operation, и state в одной транзакции");
+    
+    // Очистка
+    std::fs::remove_file(test_db_path).unwrap();
+}
+
