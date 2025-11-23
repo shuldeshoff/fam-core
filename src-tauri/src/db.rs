@@ -470,6 +470,43 @@ fn write_version_log(
     Ok(())
 }
 
+/// Верификация подписи записи version_log
+///
+/// # Arguments
+/// - `path` - путь к базе данных
+/// - `key` - ключ шифрования
+/// - `version_id` - ID записи в version_log
+///
+/// # Returns
+/// - `Ok(true)` - подпись валидна
+/// - `Ok(false)` - подпись невалидна
+/// - `Err` - ошибка при выполнении (запись не найдена, отсутствует подпись и т.д.)
+pub fn verify_version_signature(path: &str, key: &str, version_id: i64) -> Result<bool, DbError> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "key", key)?;
+    
+    // Извлекаем payload из version_log
+    let payload: String = conn.query_row(
+        "SELECT payload FROM version_log WHERE id = ?1",
+        [version_id],
+        |row| row.get(0),
+    ).map_err(|e| DbError::InitError(format!("Failed to get version_log payload: {}", e)))?;
+    
+    // Извлекаем signature и public_key из version_signatures
+    let (signature, public_key): (Vec<u8>, Vec<u8>) = conn.query_row(
+        "SELECT signature, public_key FROM version_signatures WHERE version_id = ?1",
+        [version_id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    ).map_err(|e| DbError::InitError(format!("Failed to get signature: {}", e)))?;
+    
+    // Верифицируем подпись
+    let payload_bytes = payload.as_bytes();
+    let is_valid = crate::crypto::verify_payload(payload_bytes, &signature, &public_key)
+        .map_err(|e| DbError::InitError(format!("Failed to verify signature: {}", e)))?;
+    
+    Ok(is_valid)
+}
+
 // Функции работы со счетами
 
 /// Создание нового счёта
