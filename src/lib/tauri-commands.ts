@@ -1,6 +1,13 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { DbResult, MasterKey, DerivedKey, CryptoConfig, ApiRequest, ApiResponse } from '../types/tauri';
 
+// Utility commands
+export const app = {
+  async getDbPath(): Promise<string> {
+    return await invoke('get_db_path');
+  },
+};
+
 // Database commands
 export const db = {
   async initDatabase(path: string, key: string): Promise<DbResult> {
