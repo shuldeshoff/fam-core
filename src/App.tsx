@@ -398,7 +398,6 @@ function App() {
           </div>
         </section>
       ) : showLog ? (
-        {/* Режим просмотра журнала */}
         <section style={{ padding: '15px', border: '1px solid #ddd' }}>
           <h2>Журнал изменений ({versionLog.length})</h2>
           {versionLog.length === 0 ? (
