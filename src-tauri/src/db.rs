@@ -155,6 +155,11 @@ fn run_migrations(conn: &Connection) -> Result<(), DbError> {
         update_version(conn, 6)?;
     }
     
+    if version < 7 {
+        migration_v7_version_signatures(conn)?;
+        update_version(conn, 7)?;
+    }
+    
     Ok(())
 }
 
@@ -341,6 +346,35 @@ fn migration_v6_keystore(conn: &Connection) -> SqlResult<()> {
     )?;
     
     // Индекс уже есть благодаря PRIMARY KEY
+    Ok(())
+}
+
+/// Миграция M7: Таблица version_signatures для подписей версий
+fn migration_v7_version_signatures(conn: &Connection) -> SqlResult<()> {
+    // Создаём таблицу version_signatures
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS version_signatures (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            version_id INTEGER NOT NULL,
+            signature BLOB NOT NULL,
+            public_key BLOB NOT NULL,
+            ts INTEGER NOT NULL,
+            FOREIGN KEY (version_id) REFERENCES version_log(id) ON DELETE CASCADE
+        )",
+        [],
+    )?;
+    
+    // Создаём индексы для быстрого поиска
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_version_signatures_version_id ON version_signatures(version_id)",
+        [],
+    )?;
+    
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_version_signatures_ts ON version_signatures(ts)",
+        [],
+    )?;
+    
     Ok(())
 }
 
