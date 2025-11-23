@@ -653,6 +653,110 @@ pub fn list_version_log(
     Ok(records)
 }
 
+/// Получение записей из version_log с фильтрами (сортировка ASC)
+/// 
+/// Отличие от list_version_log: сортировка по ts ASC, id ASC (хронологический порядок)
+/// Полезно для воспроизведения истории изменений от старых к новым
+/// 
+/// # Параметры
+/// - `path` - путь к базе данных
+/// - `key` - ключ шифрования
+/// - `entity` - фильтр по типу сущности (account, operation, state)
+/// - `entity_id` - фильтр по ID сущности
+pub fn get_version_log(
+    path: &str,
+    key: &str,
+    entity: Option<&str>,
+    entity_id: Option<i64>,
+) -> Result<Vec<VersionLogRecord>, DbError> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "key", key)?;
+    
+    // Строим запрос динамически в зависимости от фильтров
+    let mut query = String::from("SELECT id, entity, entity_id, action, payload, ts FROM version_log");
+    let mut conditions = Vec::new();
+    
+    if entity.is_some() {
+        conditions.push("entity = ?1");
+    }
+    
+    if entity_id.is_some() {
+        if entity.is_some() {
+            conditions.push("entity_id = ?2");
+        } else {
+            conditions.push("entity_id = ?1");
+        }
+    }
+    
+    if !conditions.is_empty() {
+        query.push_str(" WHERE ");
+        query.push_str(&conditions.join(" AND "));
+    }
+    
+    // Сортировка ASC (от старых к новым)
+    query.push_str(" ORDER BY ts ASC, id ASC");
+    
+    let mut stmt = conn.prepare(&query)?;
+    
+    // Выполняем запрос с нужными параметрами
+    let records = match (&entity, &entity_id) {
+        (Some(e), Some(eid)) => {
+            stmt.query_map([e, &eid.to_string().as_str()], |row| {
+                Ok(VersionLogRecord {
+                    id: row.get(0)?,
+                    entity: row.get(1)?,
+                    entity_id: row.get(2)?,
+                    action: row.get(3)?,
+                    payload: row.get(4)?,
+                    ts: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?
+        },
+        (Some(e), None) => {
+            stmt.query_map([e], |row| {
+                Ok(VersionLogRecord {
+                    id: row.get(0)?,
+                    entity: row.get(1)?,
+                    entity_id: row.get(2)?,
+                    action: row.get(3)?,
+                    payload: row.get(4)?,
+                    ts: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?
+        },
+        (None, Some(eid)) => {
+            stmt.query_map([&eid.to_string().as_str()], |row| {
+                Ok(VersionLogRecord {
+                    id: row.get(0)?,
+                    entity: row.get(1)?,
+                    entity_id: row.get(2)?,
+                    action: row.get(3)?,
+                    payload: row.get(4)?,
+                    ts: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?
+        },
+        (None, None) => {
+            stmt.query_map([], |row| {
+                Ok(VersionLogRecord {
+                    id: row.get(0)?,
+                    entity: row.get(1)?,
+                    entity_id: row.get(2)?,
+                    action: row.get(3)?,
+                    payload: row.get(4)?,
+                    ts: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?
+        },
+    };
+    
+    Ok(records)
+}
+
 // Tauri команды
 
 /// Инициализация базы данных
