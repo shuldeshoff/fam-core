@@ -1,18 +1,26 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { DbConfig, DbResult, EncryptionResult, DecryptionResult, ApiRequest, ApiResponse } from '../types/tauri';
+import type { DbResult, EncryptionResult, DecryptionResult, ApiRequest, ApiResponse } from '../types/tauri';
 
 // Database commands
 export const db = {
-  async initDatabase(config: DbConfig): Promise<DbResult> {
-    return await invoke('init_database', { config });
+  async initDatabase(path: string, key: string): Promise<DbResult> {
+    return await invoke('init_database', { path, key });
   },
 
-  async checkConnection(): Promise<DbResult> {
-    return await invoke('check_connection');
+  async checkConnection(path: string, key: string): Promise<DbResult> {
+    return await invoke('check_connection', { path, key });
   },
 
-  async executeQuery(query: string): Promise<string> {
-    return await invoke('execute_query', { query });
+  async executeQuery(path: string, key: string, query: string): Promise<string> {
+    return await invoke('execute_query', { path, key, query });
+  },
+
+  async getVersion(path: string, key: string): Promise<string> {
+    return await invoke('get_version', { path, key });
+  },
+
+  async setVersion(path: string, key: string, version: string): Promise<DbResult> {
+    return await invoke('set_version', { path, key, version });
   },
 };
 

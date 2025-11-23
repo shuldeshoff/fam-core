@@ -19,6 +19,8 @@ pub fn run() {
             db::init_database,
             db::check_connection,
             db::execute_query,
+            db::get_version,
+            db::set_version,
             // Crypto commands
             crypto::encrypt_data,
             crypto::decrypt_data,
