@@ -1,49 +1,92 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
+import { useState, useEffect } from "react";
+import { app, db } from "./lib/tauri-commands";
 import "./App.css";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [inputValue, setInputValue] = useState("");
+  const [result, setResult] = useState("");
+  const [dbPath, setDbPath] = useState("");
+  const [dbKey] = useState("initialization_key");
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  useEffect(() => {
+    // Получаем путь к базе данных при загрузке
+    app.getDbPath()
+      .then(path => setDbPath(path))
+      .catch(err => setResult(`Error getting DB path: ${err}`));
+  }, []);
+
+  const handleSave = async () => {
+    if (!inputValue.trim()) {
+      setResult("Введите значение для сохранения");
+      return;
+    }
+
+    try {
+      await db.writeTestRecord(dbPath, dbKey, inputValue);
+      setResult(`✓ Сохранено: "${inputValue}"`);
+    } catch (error) {
+      setResult(`✗ Ошибка сохранения: ${error}`);
+    }
+  };
+
+  const handleStatus = async () => {
+    try {
+      const status = await db.getStatus();
+      setResult(`Статус: ${status}`);
+    } catch (error) {
+      setResult(`✗ Ошибка получения статуса: ${error}`);
+    }
+  };
+
+  const handleGetVersion = async () => {
+    try {
+      const version = await db.getVersion(dbPath, dbKey);
+      setResult(`Текущее значение в БД: "${version}"`);
+    } catch (error) {
+      setResult(`✗ Ошибка чтения: ${error}`);
+    }
+  };
 
   return (
     <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+      <h1>FAM-Core Test Interface</h1>
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+      <div style={{ marginBottom: '20px', fontSize: '12px', color: '#666' }}>
+        <strong>БД:</strong> {dbPath || 'загрузка...'}
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
 
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
+      <div style={{ marginBottom: '20px' }}>
         <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder="Введите значение..."
+          style={{ 
+            width: '100%', 
+            padding: '8px', 
+            marginBottom: '10px',
+            fontSize: '14px'
+          }}
         />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
+        
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button onClick={handleSave}>Сохранить</button>
+          <button onClick={handleStatus}>Статус</button>
+          <button onClick={handleGetVersion}>Прочитать</button>
+        </div>
+      </div>
+
+      {result && (
+        <div style={{
+          padding: '12px',
+          backgroundColor: '#f5f5f5',
+          borderRadius: '4px',
+          fontSize: '14px',
+          wordBreak: 'break-word'
+        }}>
+          {result}
+        </div>
+      )}
     </main>
   );
 }
