@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "./lib/tauri-commands";
-import type { Account, Operation } from "./types/tauri";
+import type { Account, Operation, VersionLogRecord } from "./types/tauri";
 import "./App.css";
 
 function App() {
@@ -20,6 +20,11 @@ function App() {
   
   // Список операций
   const [operations, setOperations] = useState<Operation[]>([]);
+  
+  // Режим просмотра журнала
+  const [showLog, setShowLog] = useState(false);
+  const [versionLog, setVersionLog] = useState<VersionLogRecord[]>([]);
+  const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
   
   // Сообщения об ошибках/успехе
   const [message, setMessage] = useState("");
@@ -114,11 +119,38 @@ function App() {
     }
   };
 
+  const handleShowLog = async () => {
+    try {
+      const log = await api.listVersions();
+      setVersionLog(log);
+      setShowLog(true);
+      setSelectedLogId(null);
+      setMessage("");
+    } catch (error) {
+      setMessage(`Ошибка загрузки журнала: ${error}`);
+    }
+  };
+
+  const handleCloseLog = () => {
+    setShowLog(false);
+    setSelectedLogId(null);
+  };
+
+  const handleSelectLogRecord = (logId: number) => {
+    setSelectedLogId(selectedLogId === logId ? null : logId);
+  };
+
   const selectedAccount = accounts.find(acc => acc.id === selectedAccountId);
+  const selectedLogRecord = versionLog.find(log => log.id === selectedLogId);
 
   return (
     <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
-      <h1>FAM-Core</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h1>FAM-Core</h1>
+        <button onClick={showLog ? handleCloseLog : handleShowLog}>
+          {showLog ? 'Закрыть журнал' : 'Журнал'}
+        </button>
+      </div>
 
       {/* Сообщения */}
       {message && (
@@ -133,7 +165,65 @@ function App() {
         </div>
       )}
 
-      {/* Форма создания аккаунта */}
+      {/* Режим просмотра журнала */}
+      {showLog ? (
+        <section style={{ padding: '15px', border: '1px solid #ddd' }}>
+          <h2>Журнал изменений ({versionLog.length})</h2>
+          {versionLog.length === 0 ? (
+            <p>Журнал пуст</p>
+          ) : (
+            <ul style={{ listStyle: 'none', padding: 0 }}>
+              {versionLog.map((log) => (
+                <li key={log.id}>
+                  <div
+                    onClick={() => handleSelectLogRecord(log.id)}
+                    style={{
+                      padding: '10px',
+                      marginBottom: '5px',
+                      border: '1px solid #ccc',
+                      backgroundColor: selectedLogId === log.id ? '#e0e0e0' : '#fff',
+                      cursor: 'pointer',
+                      color: '#333'
+                    }}
+                  >
+                    <div>
+                      <strong>{new Date(log.ts * 1000).toLocaleString()}</strong>
+                      {' | '}
+                      <span style={{ 
+                        color: log.action === 'create' ? 'green' : log.action === 'delete' ? 'red' : 'blue' 
+                      }}>
+                        {log.action}
+                      </span>
+                      {' | '}
+                      <span>{log.entity}</span>
+                      {' '}
+                      <small>(ID: {log.entity_id})</small>
+                    </div>
+                  </div>
+                  {selectedLogId === log.id && selectedLogRecord && (
+                    <div style={{
+                      padding: '10px',
+                      marginBottom: '10px',
+                      backgroundColor: '#f9f9f9',
+                      border: '1px solid #ddd',
+                      borderTop: 'none',
+                      color: '#333',
+                      fontSize: '12px',
+                      fontFamily: 'monospace',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-all'
+                    }}>
+                      {JSON.stringify(JSON.parse(selectedLogRecord.payload), null, 2)}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : (
+        <>
+          {/* Форма создания аккаунта */}
       <section style={{ marginBottom: '30px', padding: '15px', border: '1px solid #ddd' }}>
         <h2>Создать аккаунт</h2>
         <form onSubmit={handleCreateAccount}>
@@ -225,7 +315,7 @@ function App() {
               />
             </div>
             <div style={{ marginBottom: '10px' }}>
-              <input
+        <input
                 type="text"
                 placeholder="Описание операции"
                 value={operationDescription}
@@ -234,7 +324,7 @@ function App() {
               />
             </div>
             <button type="submit">Добавить операцию</button>
-          </form>
+      </form>
         </section>
       )}
 
@@ -269,6 +359,8 @@ function App() {
             </ul>
           )}
         </section>
+      )}
+        </>
       )}
     </div>
   );
